@@ -101,3 +101,46 @@ repeat wakeorpoweron` and run under `caffeinate -is`; a missed-while-off run is
 **not** caught up, so add a sentinel-file **self-heal** check on next launch. Add
 `flock` for scheduler-agnostic single-instance. Linux equivalent: systemd timer
 with `Persistent=true`.
+
+## Spike results — run 2026-06-15
+
+### S1 — Claude economics (1 bounded real call) — DECISION: keep the lane on
+
+A single small Sonnet (`claude-sonnet-4-6`) task via
+`env -u ANTHROPIC_API_KEY claude -p --output-format json` cost **$0.0553**
+(`total_cost_usd` parsed cleanly). Extrapolation at ~$0.05/small task: a $3/night
+cap ≈ 3–15 real tasks/night and ~$90/month — within a Max-5x $100 monthly Agent
+SDK credit. Real repo-context agentic tasks cost more, so the conservative default
+holds: **`nightly_budget: 3.00`, `per_task_floor: 0.50`, default model Sonnet**.
+**Open item (operator-only):** verify the spend landed on the Agent SDK *credit*,
+not pay-as-you-go API (bug #43333) — check your account → credits once.
+
+### S2 — Claude headroom readability — DECISION: budget-fallback confirmed
+
+`claude --debug api -p 'hi'` surfaced **no** `anthropic-ratelimit-unified-*`
+headers locally. There is no supported scriptable live-remaining read on this
+subscription machine. **The Claude lane's `probe_headroom` stays budget-gated
+(KTD2)** — `nightly_budget − spent_tonight` from the ledger — as designed.
+
+### S3 — local pass rate — DECISION: local-first holds; local owns ≤ medium
+
+OpenClaw is not installable on this machine and the planned Qwen3-Coder-30B was
+not pulled, so S3 ran via the **Ollama-direct fallback** (`spikes/s3_ollama_direct.py`)
+on **`qwen2.5-coder:7b`** — single-shot codegen + real `pytest` validation, a
+**conservative floor** (an agentic OpenClaw loop and a 30B model would do better).
+Result on 4 real tasks:
+
+| Tier | Pass rate |
+|---|---|
+| low | **2/2 = 100%** |
+| medium | **1/2 = 50%** |
+| aggregate | **3/4 = 75%** |
+
+The one medium miss (`merge_intervals`) is exactly the case the dispatcher
+**escalates** to the Claude lane on validation failure — the designed behavior.
+**Decisions:** (1) local-first is justified — even a single-shot 7B clears all easy
+tasks for free; (2) set local `capability.max_complexity: medium` (50% floor at
+medium, escalation covers the misses) — the conservative operator may pin `low`
+(100% measured); (3) on this machine the validated runnable model is
+`qwen2.5-coder:7b` (Qwen3-Coder-30B remains the recommended agentic upgrade once
+pulled). The example config's `max_complexity: medium` is supported by this data.
