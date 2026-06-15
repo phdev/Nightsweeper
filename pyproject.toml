@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nightsweeper"
+version = "0.1.0"
+description = "Local-first, capacity-aware overnight scheduler that dispatches a real backlog to idle, already-paid-for agent capacity."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["PyYAML>=6.0"]
+
+[project.scripts]
+nightsweeper = "nightsweeper.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[tool.setuptools.packages.find]
+include = ["nightsweeper*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

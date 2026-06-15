@@ -1,0 +1,67 @@
+# Nightsweeper configuration (committed example).
+# Copy to nightsweeper.config.yaml (gitignored) and edit for your machine.
+
+schedule:
+  hour: 3        # 03:00 local; launchd StartCalendarInterval
+  minute: 0
+
+caps:
+  nightly_task_cap: 20       # hard stop: max tasks dispatched per night
+  nightly_dollar_cap: 5.00   # hard stop: max $ spent across cloud lanes per night
+  per_task_cap: 1.00         # ACCEPTED but INERT in V1 (enforced by V2 preflight)
+
+sources:
+  - name: github_issues
+    repos: ["phdev/Nightsweeper"]
+    labels: []               # optional label filter
+    value_label_map:
+      "priority:high": high
+      "priority:med": med
+      "priority:low": low
+    default_value: med
+    validator_label_prefix: "validator:"   # e.g. a label "validator:test"
+    default_validator: test
+
+  - name: todo_scan
+    paths: ["."]
+    # Only ENROLLED markers dispatch — bare TODO/FIXME are report-only inventory:
+    #   TODO(nightsweeper: validator=test value=med)
+    default_value: low
+
+backends:
+  - name: local                # the only truly-free lane ($0)
+    cost_rank: 0               # lower = cheaper = tried first when eligible
+    model: "qwen3-coder:30b"   # default local model (NOT gemma); configurable
+    ollama_host: "http://localhost:11434"
+    timeout_sec: 1800
+    capability:
+      validators: [test, typecheck, build, custom-cmd]
+      max_complexity: medium   # set from S3's measured pass-rate-by-complexity
+
+  - name: claude               # cheap-cloud escalation; budget-gated, fail-closed
+    cost_rank: 1
+    model: "claude-sonnet-4-6" # provisional; S1 confirms default model
+    nightly_budget: 3.00       # per-night $ budget for this lane (budget-fallback)
+    per_task_floor: 0.50       # static refuse-if-bigger floor (no estimate in V1)
+    timeout_sec: 1800
+    capability:
+      validators: [test, typecheck, build, custom-cmd, none]
+      max_complexity: high
+
+validators:
+  test: "pytest -q"
+  typecheck: "mypy ."
+  build: "make build"
+
+isolation:
+  worktree_dir: ".nightsweeper/worktrees"
+  pr_opt_in: false             # default: labeled branch only, no PR
+  branch_prefix: "nightsweeper/"
+  label_prefix: "nightsweeper:"
+
+report:
+  path: "nightsweeper-report.md"
+  downgrade:
+    window_nights: 7
+    spend_pct_threshold: 0.10  # recommend downgrade if spend < 10% of cap ...
+    min_passes: 1              # ... AND lane-attributable passes < this
