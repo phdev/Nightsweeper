@@ -12,7 +12,7 @@ import json
 import subprocess
 
 from ..adapters.backlog import BacklogSource
-from ..models import Task
+from ..models import VALIDATORS, VALUES, Task
 from ..registry import register_source
 
 
@@ -69,6 +69,11 @@ class GithubIssuesSource(BacklogSource):
             if name.startswith(self.validator_label_prefix):
                 validator = name[len(self.validator_label_prefix):]
                 break
+        # coerce typo'd labels to defaults — one bad issue must not drop the source
+        if validator not in VALIDATORS:
+            validator = self.default_validator
+        if value not in VALUES:
+            value = self.default_value
         body = issue.get("body") or ""
         return Task(
             id=f"gh:{repo}#{issue['number']}",

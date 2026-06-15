@@ -16,6 +16,9 @@ from dataclasses import dataclass
 from typing import Optional
 
 
+GIT_TIMEOUT = 120  # seconds; a hung git/gh (credential prompt, network) must not block the night
+
+
 class IsolationError(RuntimeError):
     pass
 
@@ -40,14 +43,22 @@ class WorktreeManager:
 
     # injectable for tests
     def _git(self, args: list, cwd: Optional[str] = None):
-        return subprocess.run(
-            ["git", *args], capture_output=True, text=True, cwd=cwd or self.repo_root
-        )
+        try:
+            return subprocess.run(
+                ["git", *args], capture_output=True, text=True,
+                cwd=cwd or self.repo_root, timeout=GIT_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired:
+            return subprocess.CompletedProcess(args, 124, "", "git timed out")
 
     def _gh(self, args: list, cwd: Optional[str] = None):
-        return subprocess.run(
-            ["gh", *args], capture_output=True, text=True, cwd=cwd or self.repo_root
-        )
+        try:
+            return subprocess.run(
+                ["gh", *args], capture_output=True, text=True,
+                cwd=cwd or self.repo_root, timeout=GIT_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired:
+            return subprocess.CompletedProcess(args, 124, "", "gh timed out")
 
     def branch_for(self, task_id: str) -> str:
         return self.cfg.branch_prefix + _safe_ref(task_id)
@@ -61,7 +72,9 @@ class WorktreeManager:
         # origin/HEAD may be unset locally (e.g. right after a push) — fall back to HEAD
         if self._git(["rev-parse", "--verify", "--quiet", base]).returncode != 0:
             base = "HEAD"
-        r = self._git(["worktree", "add", wdir, "-b", branch, base])
+        # -B (not -b): reset/reuse the branch so a re-create after an escalation's
+        # remove+prune does not collide with the still-existing branch.
+        r = self._git(["worktree", "add", wdir, "-B", branch, base])
         if r.returncode != 0:
             raise IsolationError(f"worktree add failed for {task.id}: {r.stderr.strip()}")
         return wdir

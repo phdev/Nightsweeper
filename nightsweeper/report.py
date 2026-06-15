@@ -38,9 +38,15 @@ def downgrade_candidates(config, ledger, night_start: str) -> list:
     out = []
     for lane, budget in _paid_lanes(config).items():
         s = hist.get(lane, {"consumed": 0.0, "passes": 0, "attempts": 0})
+        if s["attempts"] == 0:
+            continue  # never nag an unused/young lane — no evidence to act on
         budget_window = budget * dg.window_nights
         util = (s["consumed"] / budget_window) if budget_window > 0 else 0.0
-        if util < dg.spend_pct_threshold and s["passes"] < dg.min_passes:
+        low_pass = s["passes"] < dg.min_passes
+        underused = util < dg.spend_pct_threshold
+        # recommend on too-few-passes when the lane is EITHER under-used (low spend)
+        # OR paying-for-failure (spent money for too few passes) — pass-per-dollar first-class.
+        if low_pass and (underused or s["consumed"] > 0):
             out.append((lane, {
                 "window_nights": dg.window_nights,
                 "spend": s["consumed"], "budget_window": budget_window,
@@ -78,7 +84,7 @@ def generate(config, ledger, summary, inventory: dict, night_start: str) -> str:
         s = tonight.get(b.name, {"consumed": 0.0, "passes": 0, "attempts": 0})
         if b.name in paid:
             budget = paid[b.name]
-            util = f"{round(100*s['consumed']/budget,1) if budget else 0}% of ${budget:.2f} budget"
+            util = f"{round(100*s['consumed']/budget,1)}% of ${budget:.2f} budget"
             ppd = (s["passes"] / s["consumed"]) if s["consumed"] > 0 else 0.0
             util += f" · {ppd:.2f} passes/$"
             spend = f"${s['consumed']:.2f}"
@@ -87,7 +93,8 @@ def generate(config, ledger, summary, inventory: dict, night_start: str) -> str:
         lines.append(f"| {b.name} | {s['attempts']} | {s['passes']} | {spend} | {util} |")
 
     lines += ["", "## Backlog"]
-    parked_rows = [r for r in rows if r["park_reason"] or r["validation_result"] == "parked"]
+    parked_rows = [r for r in rows
+                   if r["park_reason"] or r["validation_result"] in ("parked", "skipped")]
     lines.append(f"- Parked for human review: **{summary.parked}**")
     lines.append(f"- Bare (un-enrolled) TODO/FIXME markers (not dispatched): "
                  f"**{inventory.get('bare_todo_count', 0)}**")

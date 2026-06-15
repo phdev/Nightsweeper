@@ -66,7 +66,8 @@ class ClaudeBackend(BackendAdapter):
             assert_no_api_key()
         except ApiKeyPresentError as e:
             return Result(ok=False, error=str(e))
-        if self._remaining() < self.per_task_floor:
+        r = self._remaining()  # mirror probe_headroom exactly (fail-closed at 0/floor)
+        if not (r > 0 and r >= self.per_task_floor):
             return Result(ok=False, error="below per-task budget floor (fail-closed)")
         try:
             rc, stdout, stderr = self._run_claude(task, workdir)
@@ -78,9 +79,12 @@ class ClaudeBackend(BackendAdapter):
             return Result(ok=False, error=f"claude exit {rc}: {stderr.strip()[:300]}", raw=stdout)
         try:
             payload = json.loads(stdout)
-        except (json.JSONDecodeError, TypeError) as e:
-            return Result(ok=False, error=f"unparseable claude JSON: {e}", raw=stdout)
-        cost = float(payload.get("total_cost_usd", 0.0))
-        usage = payload.get("usage", {}) or {}
-        tokens = usage.get("input_tokens", 0) + usage.get("output_tokens", 0) or None
+            # None-safe: a present-but-null total_cost_usd/usage must not crash the
+            # night AFTER the credit was spent (`float(None)` / `None + n` raise).
+            cost = float(payload.get("total_cost_usd") or 0.0)
+            usage = payload.get("usage") or {}
+            tokens = (int(usage.get("input_tokens") or 0)
+                      + int(usage.get("output_tokens") or 0)) or None
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
+            return Result(ok=False, error=f"unparseable claude JSON/cost: {e}", raw=stdout)
         return Result(ok=True, consumed_usd=cost, tokens=tokens, raw=stdout)

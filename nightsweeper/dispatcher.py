@@ -10,10 +10,13 @@ Rules (no ML, origin R7–R11, R24, R26):
   to cloud).
 - On validation failure, escalate ONCE to the next-cheapest UNTRIED eligible lane;
   if none exists, park (``no-escalation-lane``). After one escalation, park
-  (``escalation-exhausted``). ``validator: none`` parks without dispatch.
+  (``escalation-exhausted``). ``validator: none`` parks without dispatch. Any
+  isolation/dispatch exception parks the task (``dispatch-error``) — the night
+  never crashes on a single task.
 - Stop the night on the first of: nightly task cap, nightly $ cap, or no remaining
   task is processable (subsumes "all lanes out of headroom"). The $ cap is checked
-  before each task, so a single task may overshoot by its own spend (bounded).
+  before each task; a single task's full escalation chain (up to two lane runs in
+  V1) may overshoot the cap, then the next task is gated — bounded overshoot.
 """
 
 from __future__ import annotations
@@ -23,7 +26,7 @@ from datetime import datetime
 from typing import Callable, Optional
 
 from .models import RunRow, Task, value_rank
-from .validator import FAILED, PARKED, PASSED
+from .validator import FAILED, PARKED, PASSED, ValidationResult
 
 
 def _default_clock() -> str:
@@ -57,11 +60,17 @@ class Dispatcher:
         self.dispatched = 0
         self.passed = 0
         self.parked = 0
+        self._probe_cache: dict = {}
 
-    # --- eligibility ---
+    # --- eligibility (probe results cached per loop iteration; cleared after a dispatch) ---
 
     def _capability(self, backend_name: str):
         return self.config.backend(backend_name).capability
+
+    def _probe(self, lane):
+        if lane.name not in self._probe_cache:
+            self._probe_cache[lane.name] = lane.probe_headroom()
+        return self._probe_cache[lane.name]
 
     def eligible_lanes(self, task: Task, exclude=()):
         out = []
@@ -70,7 +79,7 @@ class Dispatcher:
                 continue
             if not self._capability(b.name).allows(task.validator, task.est_complexity):
                 continue
-            if not b.probe_headroom().available:
+            if not self._probe(b).available:
                 continue
             out.append(b)
         return out  # already cost_rank-ordered
@@ -90,57 +99,63 @@ class Dispatcher:
         ))
         if passed:
             self.passed += 1
-        elif result == PARKED or park_reason:
+        elif park_reason:  # a terminal park (no-dispatch, no-escalation-lane, etc.)
             self.parked += 1
 
-    # --- per-task processing ---
+    # --- per-task processing (every iteration is exception-guarded) ---
 
     def _process(self, task: Task) -> None:
         self.dispatched += 1
         tried: set = set()
         escalated = False
         while True:
-            elig = self.eligible_lanes(task, exclude=tried)
-            if not elig:
+            try:
+                elig = self.eligible_lanes(task, exclude=tried)
+                if not elig:
+                    reason = "escalation-exhausted" if escalated else "no-escalation-lane"
+                    self.isolation.cleanup(task, keep=True)
+                    self._record(task, "(none)", FAILED, False, escalated, None, reason, 0.0)
+                    return
+                lane = elig[0]
+                wdir = self.isolation.create(task)
+                est = lane.estimate(task)  # dormant in V1 → None
+                plo, phi = (est.lo, est.hi) if est else (None, None)
+                result = lane.dispatch(task, wdir, context=None)
+                self.total_spend += result.consumed_usd
+                self._probe_cache = {}  # spend changed → re-probe lanes for escalation
+                if result.ok:
+                    validation = self.validator.validate(task, wdir)
+                else:
+                    validation = ValidationResult(FAILED, result.error or "dispatch failed")
+
+                if validation.passed:
+                    handoff = self.isolation.handoff(task, wdir)
+                    self.isolation.cleanup(task, keep=False)
+                    self._record(task, lane.name, PASSED, True, escalated, handoff.branch,
+                                 None, result.consumed_usd, plo, phi)
+                    return
+
+                tried.add(lane.name)
+                next_elig = [] if escalated else self.eligible_lanes(task, exclude=tried)
+                if next_elig:
+                    self._record(task, lane.name, FAILED, False, escalated, None, None,
+                                 result.consumed_usd, plo, phi)
+                    self.isolation.cleanup(task, keep=False)
+                    escalated = True
+                    continue
+                reason = "escalation-exhausted" if escalated else "no-escalation-lane"
                 self.isolation.cleanup(task, keep=True)
-                self._record(task, "(none)", FAILED, False, escalated, None,
-                             "no-escalation-lane", 0.0)
-                return
-            lane = elig[0]
-            wdir = self.isolation.create(task)
-            est = lane.estimate(task)  # dormant in V1 → None
-            plo, phi = (est.lo, est.hi) if est else (None, None)
-            # dormant V2 per-task-cap skip would go here, falling through to stop-check
-            result = lane.dispatch(task, wdir, context=None)
-            self.total_spend += result.consumed_usd
-            if result.ok:
-                validation = self.validator.validate(task, wdir)
-            else:
-                from .validator import ValidationResult
-                validation = ValidationResult(FAILED, result.error or "dispatch failed")
-
-            if validation.passed:
-                handoff = self.isolation.handoff(task, wdir)
-                self.isolation.cleanup(task, keep=False)
-                self._record(task, lane.name, PASSED, True, escalated, handoff.branch,
-                             None, result.consumed_usd, plo, phi)
-                return
-
-            tried.add(lane.name)
-            next_elig = [] if escalated else self.eligible_lanes(task, exclude=tried)
-            if next_elig:
-                # non-terminal failure → record, drop worktree, escalate once
-                self._record(task, lane.name, FAILED, False, escalated, None, None,
+                self._record(task, lane.name, FAILED, False, escalated, None, reason,
                              result.consumed_usd, plo, phi)
-                self.isolation.cleanup(task, keep=False)
-                escalated = True
-                continue
-            # terminal failure → park, preserve worktree
-            reason = "escalation-exhausted" if escalated else "no-escalation-lane"
-            self.isolation.cleanup(task, keep=True)
-            self._record(task, lane.name, FAILED, False, escalated, None, reason,
-                         result.consumed_usd, plo, phi)
-            return
+                return
+            except Exception as e:  # one task must never crash the night
+                try:
+                    self.isolation.cleanup(task, keep=True)
+                except Exception:
+                    pass
+                self._record(task, "(none)", FAILED, False, escalated, None,
+                             f"dispatch-error: {str(e)[:80]}", 0.0)
+                return
 
     def _park_no_dispatch(self, task: Task, reason: str) -> None:
         self._record(task, "(none)", PARKED, False, False, None, reason, 0.0)
@@ -153,6 +168,7 @@ class Dispatcher:
         i = 0
         stop_reason = "backlog-drained"
         while i < total:
+            self._probe_cache = {}  # fresh probes per iteration (budget may have changed)
             if self.dispatched >= self.caps.nightly_task_cap:
                 stop_reason = "nightly-task-cap"
                 break

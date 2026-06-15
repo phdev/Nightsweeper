@@ -46,7 +46,8 @@ Linear, Gbrain, preflight) with no signature or schema change.
   eligibility — never ordering or selection.
 - **Claude lane is budget-gated + fail-closed.** Never set `ANTHROPIC_API_KEY`
   (`dispatch` hard-refuses if present; grounding §1). No pre-dispatch estimate in V1;
-  the $ cap is enforced post-run (bounded single-task overshoot).
+  the $ cap is enforced post-run (overshoot bounded by one task's full escalation
+  chain — up to two lane runs in V1).
 - **Deterministic dispatch only** — no ML routing.
 - **Report stays honest** — always print per-lane utilization, recommend downgrade
   when the metric fires.

@@ -8,6 +8,7 @@ unlimited, and it warns that ``per_task_cap`` is inert in V1 (enforced in V2).
 
 from __future__ import annotations
 
+import dataclasses
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -108,6 +109,15 @@ def _require(d: dict, key: str, ctx: str) -> Any:
     return d[key]
 
 
+def _construct(cls, raw: dict, ctx: str):
+    """Build a dataclass from a YAML mapping, rejecting unknown keys with a clear error."""
+    allowed = {f.name for f in dataclasses.fields(cls)}
+    unknown = set(raw) - allowed
+    if unknown:
+        raise ConfigError(f"{ctx}: unknown key(s) {sorted(unknown)}; allowed {sorted(allowed)}")
+    return cls(**raw)
+
+
 def _parse_capability(raw: dict, ctx: str) -> Capability:
     vals = raw.get("validators", sorted(VALIDATORS))
     bad = set(vals) - VALIDATORS
@@ -165,6 +175,8 @@ def parse(raw: dict) -> Config:
         sources.append(SourceConfig(name=name, options=opts))
     if not sources:
         raise ConfigError("config: at least one source is required")
+    if len({s.name for s in sources}) != len(sources):
+        raise ConfigError("sources: names must be unique")
 
     # Backends + capability matrix
     backends = []
@@ -182,13 +194,15 @@ def parse(raw: dict) -> Config:
     ranks = [b.cost_rank for b in backends]
     if len(set(ranks)) != len(ranks):
         raise ConfigError("backends: cost_rank values must be unique (defines lane ordering)")
+    if len({b.name for b in backends}) != len(backends):
+        raise ConfigError("backends: names must be unique")
 
     validators = dict(raw.get("validators", {}))
-    isolation = Isolation(**raw.get("isolation", {}))
+    isolation = _construct(Isolation, raw.get("isolation", {}), "isolation")
     report_raw = dict(raw.get("report", {}))
-    downgrade = Downgrade(**report_raw.pop("downgrade", {}))
-    report = ReportConfig(downgrade=downgrade, **report_raw)
-    schedule = Schedule(**raw.get("schedule", {}))
+    downgrade = _construct(Downgrade, report_raw.pop("downgrade", {}), "report.downgrade")
+    report = _construct(ReportConfig, {**report_raw, "downgrade": downgrade}, "report")
+    schedule = _construct(Schedule, raw.get("schedule", {}), "schedule")
 
     return Config(
         sources=sources,

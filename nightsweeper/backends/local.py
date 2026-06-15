@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 
 from ..adapters.backend import BackendAdapter
+from ..env import scrubbed_env
 from ..models import Capacity, Result
 from ..registry import register_backend
 
@@ -49,7 +50,8 @@ class LocalBackend(BackendAdapter):
         ]
         try:
             out = subprocess.run(
-                cmd, capture_output=True, text=True, cwd=workdir, timeout=self.timeout_sec
+                cmd, capture_output=True, text=True, cwd=workdir,
+                timeout=self.timeout_sec, env=scrubbed_env(),
             )
         except FileNotFoundError:
             return False, None, "openclaw not installed (local lane unavailable)"
