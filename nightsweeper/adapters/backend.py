@@ -23,6 +23,15 @@ class BackendAdapter(abc.ABC):
     name: str
     cost_rank: int
 
+    def bind_runtime(self, ledger, night_start_ts: str) -> None:
+        """Wire per-night runtime state (ledger + night start) before probing.
+
+        Concrete no-op by default; budget-gated cloud lanes override it to read
+        tonight's spend-so-far. Internal lifecycle hook — not part of the
+        external adapter surface, so it leaves probe/dispatch/estimate unchanged.
+        """
+        return None
+
     @abc.abstractmethod
     def probe_headroom(self) -> Capacity:
         """Idle capacity for tonight. Local → unbounded/$0; cloud → remaining $ budget."""
