@@ -63,6 +63,7 @@ class Isolation:
     pr_opt_in: bool = False
     branch_prefix: str = "nightsweeper/"
     label_prefix: str = "nightsweeper:"
+    base_ref: str = "origin/HEAD"
 
 
 @dataclass

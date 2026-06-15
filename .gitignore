@@ -1,4 +1,6 @@
-# Local machine-only config (caps, secrets paths, source lists)
+# Local machine-only config (caps, secrets paths, source lists).
+# Only nightsweeper.config.example.yaml is committed.
+nightsweeper.config.yaml
 nightsweeper.config.local.yaml
 
 # Local SQLite ledger + WAL sidecars
@@ -38,3 +40,6 @@ bun.lockb
 .DS_Store
 *.swp
 .venv/
+
+# Generated morning report
+nightsweeper-report.md

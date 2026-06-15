@@ -45,6 +45,20 @@ def test_create_adds_worktree_from_origin_head():
     assert add and add[0][1][-1] == "origin/HEAD"
 
 
+def test_create_falls_back_to_head_when_origin_head_missing():
+    m = _mgr()
+
+    def fake_git(args, cwd=None):
+        m.calls.append(("git", tuple(args)))
+        # origin/HEAD verify fails; everything else succeeds
+        return FakeRun(1 if args[0] == "rev-parse" else 0)
+
+    m._git = fake_git
+    m.create(_task())
+    add = [c for c in m.calls if c[1][0] == "worktree" and c[1][1] == "add"][0]
+    assert add[1][-1] == "HEAD"  # fell back from origin/HEAD
+
+
 def test_handoff_branch_only_when_pr_off():
     m = _mgr(pr_opt_in=False)
     h = m.handoff(_task(), "/repo/.nightsweeper/worktrees/x")

@@ -1,0 +1,7 @@
+#!/bin/bash
+# Nightsweeper nightly wrapper (rendered by `nightsweeper install-scheduler`).
+# Runs under `caffeinate -is` so the Mac cannot idle-sleep mid-run. Single-instance
+# and missed-run self-heal are handled inside the CLI (fcntl lock + sentinel).
+set -euo pipefail
+cd "{repo}"
+exec caffeinate -is "{python}" -m nightsweeper.cli --config "{config}" run --if-missed

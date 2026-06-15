@@ -57,7 +57,11 @@ class WorktreeManager:
 
     def create(self, task) -> str:
         branch, wdir = self.branch_for(task.id), self.workdir_for(task.id)
-        r = self._git(["worktree", "add", wdir, "-b", branch, "origin/HEAD"])
+        base = getattr(self.cfg, "base_ref", "origin/HEAD")
+        # origin/HEAD may be unset locally (e.g. right after a push) — fall back to HEAD
+        if self._git(["rev-parse", "--verify", "--quiet", base]).returncode != 0:
+            base = "HEAD"
+        r = self._git(["worktree", "add", wdir, "-b", branch, base])
         if r.returncode != 0:
             raise IsolationError(f"worktree add failed for {task.id}: {r.stderr.strip()}")
         return wdir
