@@ -14,7 +14,7 @@ import urllib.request
 
 from ..adapters.backend import BackendAdapter
 from ..env import scrubbed_env
-from ..models import Capacity, Result
+from ..models import Capacity, CostRange, Result
 from ..registry import register_backend
 
 
@@ -64,3 +64,7 @@ class LocalBackend(BackendAdapter):
     def dispatch(self, task, workdir, context=None) -> Result:
         ok, raw, err = self._run_agent(task, workdir)
         return Result(ok=ok, consumed_usd=0.0, tokens=None, raw=raw, error=err)
+
+    def estimate(self, task) -> CostRange:
+        return CostRange(lo=0.0, hi=0.0)  # local is free
+

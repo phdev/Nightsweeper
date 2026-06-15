@@ -19,6 +19,7 @@ import subprocess
 from ..adapters.backend import BackendAdapter
 from ..env import ApiKeyPresentError, assert_no_api_key, scrubbed_env
 from ..models import Capacity, Result
+from ..preflight import estimate_usd, parse_cost_model
 from ..registry import register_backend
 
 
@@ -31,8 +32,12 @@ class ClaudeBackend(BackendAdapter):
         self.nightly_budget = float(o.get("nightly_budget", 0.0))
         self.per_task_floor = float(o.get("per_task_floor", 0.0))
         self.timeout_sec = int(o.get("timeout_sec", 1800))
+        self.cost_model = parse_cost_model(o)  # preflight (V2); None → estimate() returns None
         self._ledger = None
         self._night_start = None
+
+    def estimate(self, task):
+        return estimate_usd(task.est_context_tokens, self.cost_model)
 
     def bind_runtime(self, ledger, night_start_ts: str) -> None:
         self._ledger = ledger

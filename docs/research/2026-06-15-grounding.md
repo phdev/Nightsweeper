@@ -144,3 +144,42 @@ medium, escalation covers the misses) — the conservative operator may pin `low
 (100% measured); (3) on this machine the validated runnable model is
 `qwen2.5-coder:7b` (Qwen3-Coder-30B remains the recommended agentic upgrade once
 pulled). The example config's `max_complexity: medium` is supported by this data.
+
+### S4 — Codex headroom readability (V2) — DECISION: real probe via session scrape
+
+`codex-cli 0.139.0` is installed and `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`
+exists. A real rollout from 2026-06-15 carries `payload.type == "token_count"`
+with a populated `rate_limits` object — **exact shape confirmed**:
+
+```json
+"rate_limits": {
+  "primary":   {"used_percent": 7.0,  "window_minutes": 300,   "resets_at": 1781557540},
+  "secondary": {"used_percent": 19.0, "window_minutes": 10080,  "resets_at": 1781745500},
+  "plan_type": "prolite"
+}
+```
+
+So the Codex lane's `probe_headroom` **scrapes the newest rollout** for the latest
+populated `token_count.rate_limits` and is available when both windows are below a
+configured `max_used_percent` (default 95). Note: the field is `resets_at` (unix
+epoch), not `resets_in_seconds`. Fallback (infer-from-errors) only if no populated
+rollout exists. Codex on a ChatGPT plan is **$0 marginal** (quota-gated, not
+metered), so `cost_rank` sits between local ($0, unlimited) and claude (metered $).
+
+### S5 — Gbrain MCP surface (V2) — DECISION: enricher, not a source
+
+No Gbrain MCP is registered in the session and no `gbrain` CLI is present. Per the
+brief's rule ("if only memory retrieval, keep Gbrain as a read-only context
+enricher, not a source"), and honoring "never invent work" (no confirmed backlog
+surface), **Gbrain ships as a read-only context enricher** threaded through the
+dormant `dispatch(…, context=)` hook. It degrades to a no-op when no MCP is
+available. The backlog-source path stays gated behind a confirmed
+backlog-capable MCP.
+
+### S6 — Preflight accuracy (V2) — DECISION: advisory-only default
+
+No 20-task predicted-vs-actual replay exists yet, so preflight cannot clear the
+≥70% bracket bar. Per the brief, **preflight ships advisory-only**: the dispatcher
+records `predicted_lo/hi` and the report shows a bracket-accuracy line, but the
+per-task-cost-cap **gate** is opt-in (`preflight.mode: gate`) and stays off until
+the operator's own replay clears 70%.

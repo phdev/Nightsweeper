@@ -17,8 +17,10 @@ nightsweeper/
   adapters/
     backend.py     BackendAdapter ABC: probe_headroom / dispatch(…, context=None) / estimate→None / bind_runtime
     backlog.py     BacklogSource ABC: fetch / inventory
-  backends/        local.py (Ollama), claude_headless.py (budget-gated, fail-closed)
-  sources/         github_issues.py (gh), todo_scan.py (enrolled markers only)
+  preflight.py     V2 cost model → CostRange (estimate); advisory by default
+  backends/        local.py (Ollama), claude_headless.py (budget-gated), codex.py [V2]
+  sources/         github_issues.py (gh), todo_scan.py (enrolled), linear.py [V2]
+  enrichers/       gbrain.py [V2] read-only context (no-op without MCP) + CompositeEnricher
   isolation.py     git worktree per task; push-then-optional-PR; cleanup+prune
   validator.py     run the configured validator in the worktree (executable; none→park)
   dispatcher.py    THE CORE IP — value order, capability gate, cost_rank select,
@@ -62,7 +64,7 @@ Linear, Gbrain, preflight) with no signature or schema change.
 
 ## Testing
 
-`.venv/bin/python -m pytest -q` (65 tests). Adapters take injectable subprocess
+`.venv/bin/python -m pytest -q` (88 tests; V2 in `tests/test_v2.py`). Adapters take injectable subprocess
 seams (`_gh`, `_run_agent`, `_run_claude`, `_git`, `_run`) so logic is unit-tested
 without live CLIs. `tests/conftest.py` holds the dispatcher/report test doubles;
 `tests/test_end_to_end.py` runs the real loop with a real validator.

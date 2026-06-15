@@ -121,10 +121,17 @@ def generate(config, ledger, summary, inventory: dict, night_start: str) -> str:
             f"capacity you are not using."
         )
 
-    # Dormant V2 line: only rendered once predicted_lo/hi are populated.
-    if any(r["predicted_lo"] is not None for r in rows):
+    # Preflight accuracy (V2): renders once predicted_lo/hi are populated.
+    pred_rows = [r for r in rows if r["predicted_lo"] is not None
+                 and r["validation_result"] in ("passed", "failed")]
+    if pred_rows:
+        bracketed = sum(1 for r in pred_rows
+                        if r["predicted_lo"] <= r["consumed"] <= r["predicted_hi"])
+        pct = round(100 * bracketed / len(pred_rows), 1)
         lines += ["", "## Preflight accuracy (V2)",
-                  "- (predicted-vs-actual bracketing line renders here when preflight is active.)"]
+                  f"- [predicted_lo, predicted_hi] bracketed actual cost in "
+                  f"**{bracketed}/{len(pred_rows)} ({pct}%)** of predicted dispatches "
+                  f"(≥70% supports promoting preflight from advisory to gate)."]
 
     text = "\n".join(lines) + "\n"
     _write(config, text)

@@ -22,6 +22,7 @@ from . import config as configmod
 from . import registry
 from . import report as reportmod
 from .dispatcher import Dispatcher
+from .enrichers import CompositeEnricher
 from .isolation import WorktreeManager
 from .ledger import Ledger
 from .validator import Validator
@@ -90,7 +91,10 @@ def cmd_run(args) -> int:
 
         iso = WorktreeManager(root, cfg.isolation, repo_slug=_repo_slug())
         validator = Validator(cfg.validators)
-        disp = Dispatcher(backends, iso, validator, ledger, cfg)
+        enrichers = registry.build_enrichers(cfg)
+        enricher = (enrichers[0] if len(enrichers) == 1
+                    else (CompositeEnricher(enrichers) if enrichers else None))
+        disp = Dispatcher(backends, iso, validator, ledger, cfg, enricher=enricher)
         summary = disp.run(tasks)
         text = reportmod.generate(cfg, ledger, summary, inventory, disp.night_start)
         sentinel.write_text(today)

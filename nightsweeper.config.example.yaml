@@ -8,7 +8,17 @@ schedule:
 caps:
   nightly_task_cap: 20       # hard stop: max tasks dispatched per night
   nightly_dollar_cap: 5.00   # hard stop: max $ spent across cloud lanes per night
-  per_task_cap: 1.00         # ACCEPTED but INERT in V1 (enforced by V2 preflight)
+  per_task_cap: 1.00         # enforced only when preflight.mode == 'gate' (V2)
+
+# Read-only context enrichers (V2): never produce tasks, only add context passed
+# to a lane via dispatch(context=). Gbrain is an enricher (no confirmed backlog MCP).
+enrichers: []                # e.g. ["gbrain"] once a Gbrain MCP is wired
+
+# Preflight cost prediction (V2). 'advisory' records predicted_lo/hi + a report
+# accuracy line; 'gate' additionally skips tasks whose estimate exceeds per_task_cap.
+# Ships 'advisory' until your own 20-task replay clears the >=70% bracket bar (S6).
+preflight:
+  mode: advisory
 
 sources:
   - name: github_issues
@@ -28,22 +38,41 @@ sources:
     #   TODO(nightsweeper: validator=test value=med)
     default_value: low
 
+  # V2 source (needs $LINEAR_API_KEY):
+  # - name: linear
+  #   team: ENG
+  #   default_value: med
+  #   default_validator: test
+
 backends:
-  - name: local                # the only truly-free lane ($0)
+  - name: local                # the only truly-free lane ($0, unlimited)
     cost_rank: 0               # lower = cheaper = tried first when eligible
-    model: "qwen3-coder:30b"   # default local model (NOT gemma); configurable
+    model: "qwen2.5-coder:7b"  # S3-validated; Qwen3-Coder-30B is the agentic upgrade
     ollama_host: "http://localhost:11434"
     timeout_sec: 1800
     capability:
       validators: [test, typecheck, build, custom-cmd]
       max_complexity: medium   # set from S3's measured pass-rate-by-complexity
 
-  - name: claude               # cheap-cloud escalation; budget-gated, fail-closed
-    cost_rank: 1
-    model: "claude-sonnet-4-6" # provisional; S1 confirms default model
-    nightly_budget: 3.00       # per-night $ budget for this lane (budget-fallback)
-    per_task_floor: 0.50       # static refuse-if-bigger floor (no estimate in V1)
+  - name: codex                # V2: ChatGPT-plan quota, $0 marginal, quota-gated
+    cost_rank: 1               # cheaper than claude ($0 vs metered) → preferred cloud lane
+    max_used_percent: 95       # unavailable once either rate-limit window hits this
+    sessions_dir: "~/.codex/sessions"
     timeout_sec: 1800
+    capability:
+      validators: [test, typecheck, build, custom-cmd]
+      max_complexity: high
+
+  - name: claude               # metered cloud lane; budget-gated, fail-closed
+    cost_rank: 2
+    model: "claude-sonnet-4-6" # S1: ~$0.05/small task
+    nightly_budget: 3.00       # per-night $ budget for this lane (budget-fallback)
+    per_task_floor: 0.50       # min remaining budget to attempt (no estimate in V1)
+    timeout_sec: 1800
+    cost_model:                # V2 preflight estimate (Sonnet list rates, $/Mtok)
+      input_per_mtok: 3.0
+      output_per_mtok: 15.0
+      expected_output_tokens: 1500
     capability:
       validators: [test, typecheck, build, custom-cmd, none]
       max_complexity: high

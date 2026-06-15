@@ -40,7 +40,7 @@ def test_missing_nightly_dollar_cap_raises_not_unlimited():
 def test_per_task_cap_warns_inert_in_v1():
     raw = _minimal()
     raw["caps"]["per_task_cap"] = 1.0
-    with pytest.warns(UserWarning, match="INERT in V1"):
+    with pytest.warns(UserWarning, match="enforced only when preflight"):
         cfg.parse(raw)
 
 

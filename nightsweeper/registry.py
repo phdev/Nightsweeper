@@ -15,6 +15,7 @@ from .adapters.backlog import BacklogSource
 
 BACKENDS: dict = {}
 SOURCES: dict = {}
+ENRICHERS: dict = {}
 
 
 class RegistryError(ValueError):
@@ -39,10 +40,20 @@ def register_source(name: str) -> Callable:
     return deco
 
 
+def register_enricher(name: str) -> Callable:
+    def deco(cls):
+        ENRICHERS[name] = cls
+        cls.name = name
+        return cls
+
+    return deco
+
+
 def register_builtins() -> None:
-    """Import the V1 adapters so their decorators register them."""
-    from .backends import claude_headless, local  # noqa: F401
-    from .sources import github_issues, todo_scan  # noqa: F401
+    """Import the V1 + V2 adapters so their decorators register them."""
+    from .backends import claude_headless, codex, local  # noqa: F401
+    from .sources import github_issues, linear, todo_scan  # noqa: F401
+    from .enrichers import gbrain  # noqa: F401
 
 
 def build_backends(config) -> list:
@@ -64,4 +75,16 @@ def build_sources(config) -> list:
                 f"unknown source '{scfg.name}' (registered: {sorted(SOURCES)})"
             )
         out.append(SOURCES[scfg.name](scfg))
+    return out
+
+
+def build_enrichers(config) -> list:
+    """Build read-only context enrichers named in config.enrichers (V2)."""
+    out = []
+    for name in getattr(config, "enrichers", []):
+        if name not in ENRICHERS:
+            raise RegistryError(
+                f"unknown enricher '{name}' (registered: {sorted(ENRICHERS)})"
+            )
+        out.append(ENRICHERS[name]())
     return out

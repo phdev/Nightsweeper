@@ -84,15 +84,25 @@ execute). Run these before trusting a lane:
 V1: GitHub issues + enrolled-TODO sources; local + Claude lanes; configurable test
 command validator; one worktree/task; SQLite ledger; markdown report.
 
-V2 (roadmap — new adapters only, no rewrite): Codex lane, Linear + Gbrain sources,
-preflight cost prediction. The seams are already built: the two adapter interfaces,
-the dormant `estimate()` and `dispatch(…, context=)` hooks, and the nullable
-`predicted_lo/hi` ledger columns.
+V2 (built — new adapters only, no dispatcher rewrite):
+
+- **Codex lane** (`codex exec`, ChatGPT-plan quota, $0 marginal) — `probe_headroom`
+  scrapes the newest `~/.codex/sessions/**/rollout-*.jsonl` for live rate-limit
+  windows (spike S4).
+- **Linear source** (Linear GraphQL, `$LINEAR_API_KEY`).
+- **Gbrain enricher** — read-only context threaded through `dispatch(…, context=)`;
+  *not* a source (no confirmed backlog MCP — spike S5). Graceful no-op without an MCP.
+- **Preflight cost prediction** — a `cost_model` per cloud lane fills `predicted_lo/hi`;
+  the report shows bracket accuracy. The per-task-cap **gate** is opt-in
+  (`preflight.mode: gate`); it ships `advisory` until your replay clears ≥70% (S6).
+
+These attach at the seams V1 built (the two adapter interfaces, the `estimate()` and
+`dispatch(…, context=)` hooks, the `predicted_lo/hi` columns) — no rewrite.
 
 ## Development
 
 ```bash
-.venv/bin/python -m pytest -q     # 65 tests
+.venv/bin/python -m pytest -q     # 88 tests (V1 + V2)
 ```
 
 See `CLAUDE.md` for the architecture map and how to add a lane/source.

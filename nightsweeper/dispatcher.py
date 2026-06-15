@@ -45,13 +45,15 @@ class NightSummary:
 
 class Dispatcher:
     def __init__(self, backends, isolation, validator, ledger, config,
-                 clock: Optional[Callable[[], str]] = None):
+                 enricher=None, clock: Optional[Callable[[], str]] = None):
         self.backends = sorted(backends, key=lambda b: b.cost_rank)
         self.isolation = isolation
         self.validator = validator
         self.ledger = ledger
         self.config = config
         self.caps = config.caps
+        self.enricher = enricher  # V2 read-only context (dormant dispatch context= hook)
+        self.preflight_gate = getattr(config, "preflight", None) and config.preflight.mode == "gate"
         self.clock = clock or _default_clock
         self.night_start = self.clock()
         for b in self.backends:
@@ -105,7 +107,18 @@ class Dispatcher:
     # --- per-task processing (every iteration is exception-guarded) ---
 
     def _process(self, task: Task) -> None:
+        # Preflight gate (V2, opt-in): skip if the cheapest eligible lane's estimate
+        # exceeds the per-task cap. Falls through to the stop-check, like park (KTD10).
+        if self.preflight_gate and self.caps.per_task_cap is not None:
+            elig0 = self.eligible_lanes(task)
+            if elig0:
+                est0 = elig0[0].estimate(task)
+                if est0 is not None and est0.lo > self.caps.per_task_cap:
+                    self._record(task, elig0[0].name, "skipped", False, False, None,
+                                 "over-per-task-cap", 0.0, est0.lo, est0.hi)
+                    return
         self.dispatched += 1
+        context = self.enricher.enrich(task) if self.enricher else None
         tried: set = set()
         escalated = False
         while True:
@@ -120,7 +133,7 @@ class Dispatcher:
                 wdir = self.isolation.create(task)
                 est = lane.estimate(task)  # dormant in V1 → None
                 plo, phi = (est.lo, est.hi) if est else (None, None)
-                result = lane.dispatch(task, wdir, context=None)
+                result = lane.dispatch(task, wdir, context=context)
                 self.total_spend += result.consumed_usd
                 self._probe_cache = {}  # spend changed → re-probe lanes for escalation
                 if result.ok:

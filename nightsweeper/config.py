@@ -87,6 +87,12 @@ class Schedule:
 
 
 @dataclass
+class Preflight:
+    # 'advisory' records predicted_lo/hi only; 'gate' also skips over-per-task-cap tasks (V2)
+    mode: str = "advisory"
+
+
+@dataclass
 class Config:
     sources: list
     backends: list
@@ -95,6 +101,8 @@ class Config:
     isolation: Isolation
     report: ReportConfig
     schedule: Schedule
+    enrichers: list = field(default_factory=list)
+    preflight: Preflight = field(default_factory=Preflight)
 
     def backend(self, name: str) -> BackendConfig:
         for b in self.backends:
@@ -162,8 +170,9 @@ def parse(raw: dict) -> Config:
         raise ConfigError("caps: nightly_task_cap must be > 0 and nightly_dollar_cap >= 0")
     if caps.per_task_cap is not None:
         warnings.warn(
-            "caps.per_task_cap is accepted but INERT in V1 (no preflight estimate); "
-            "it is enforced only in V2.",
+            "caps.per_task_cap is enforced only when preflight.mode is 'gate' AND a "
+            "backend provides an estimate (V2). It is inert under the default "
+            "preflight.mode 'advisory'.",
             stacklevel=2,
         )
 
@@ -203,6 +212,10 @@ def parse(raw: dict) -> Config:
     downgrade = _construct(Downgrade, report_raw.pop("downgrade", {}), "report.downgrade")
     report = _construct(ReportConfig, {**report_raw, "downgrade": downgrade}, "report")
     schedule = _construct(Schedule, raw.get("schedule", {}), "schedule")
+    enrichers = list(raw.get("enrichers", []))
+    preflight = _construct(Preflight, raw.get("preflight", {}), "preflight")
+    if preflight.mode not in ("advisory", "gate"):
+        raise ConfigError(f"preflight.mode {preflight.mode!r} not in ('advisory','gate')")
 
     return Config(
         sources=sources,
@@ -212,4 +225,6 @@ def parse(raw: dict) -> Config:
         isolation=isolation,
         report=report,
         schedule=schedule,
+        enrichers=enrichers,
+        preflight=preflight,
     )
