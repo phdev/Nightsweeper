@@ -1,0 +1,39 @@
+# Local machine-only config (caps, secrets paths, source lists)
+nightsweeper.config.local.yaml
+
+# Local SQLite ledger + WAL sidecars
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Compound-engineering machine-local config
+.compound-engineering/config.local.yaml
+
+# Per-task worktrees (created at runtime under .nightsweeper/worktrees/)
+.nightsweeper/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / TypeScript / Bun
+node_modules/
+dist/
+bun.lockb
+*.tsbuildinfo
+
+# Go
+/bin/
+*.out
+
+# OS / editor
+.DS_Store
+*.swp
