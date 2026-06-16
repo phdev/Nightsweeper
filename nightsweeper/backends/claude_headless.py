@@ -32,6 +32,12 @@ class ClaudeBackend(BackendAdapter):
         self.nightly_budget = float(o.get("nightly_budget", 0.0))
         self.per_task_floor = float(o.get("per_task_floor", 0.0))
         self.timeout_sec = int(o.get("timeout_sec", 1800))
+        # Headless claude -p cannot make file edits without a permission grant; without
+        # this the lane runs (and bills) but never writes — it parks every task. The
+        # git worktree is the isolation boundary. 'skip' = --dangerously-skip-permissions
+        # (full autonomy, the cron pattern); 'acceptEdits' = file edits only, gates Bash;
+        # 'default' = no flag (will park — for the safety-conscious).
+        self.permission_mode = o.get("permission_mode", "skip")
         self.cost_model = parse_cost_model(o)  # preflight (V2); None → estimate() returns None
         self._ledger = None
         self._night_start = None
@@ -58,8 +64,12 @@ class ClaudeBackend(BackendAdapter):
     # injectable for tests
     def _run_claude(self, task, workdir: str):
         """Return (returncode, stdout, stderr). Real impl shells claude -p."""
-        cmd = ["claude", "-p", "--output-format", "json", "--model", self.model,
-               f"{task.title}\n\n{task.body}"]
+        cmd = ["claude", "-p", "--output-format", "json", "--model", self.model]
+        if self.permission_mode == "skip":
+            cmd.append("--dangerously-skip-permissions")  # required to edit files headlessly
+        elif self.permission_mode == "acceptEdits":
+            cmd += ["--permission-mode", "acceptEdits"]
+        cmd.append(f"{task.title}\n\n{task.body}")
         out = subprocess.run(
             cmd, capture_output=True, text=True, cwd=workdir,
             timeout=self.timeout_sec, env=scrubbed_env(),

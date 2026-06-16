@@ -55,6 +55,19 @@ def test_dispatch_refuses_when_api_key_present(monkeypatch):
     assert r.ok is False and "ANTHROPIC_API_KEY" in r.error  # hard refuse, uncapped-bill guard
 
 
+def test_run_claude_includes_skip_permissions(monkeypatch):
+    import nightsweeper.backends.claude_headless as cmod
+    be = _be()  # default permission_mode == 'skip'
+    captured = {}
+
+    class _R:
+        returncode, stdout, stderr = 0, '{"total_cost_usd": 0}', ""
+
+    monkeypatch.setattr(cmod.subprocess, "run", lambda cmd, **kw: captured.update(cmd=cmd) or _R())
+    be._run_claude(_task(), "/wd")
+    assert "--dangerously-skip-permissions" in captured["cmd"]  # else claude can't edit files
+
+
 def test_dispatch_unparseable_json_fails(monkeypatch):
     be = _be()
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
