@@ -13,9 +13,13 @@
 > opt-in `preflight.mode: gate` parks over-`per_task_cap` chores). **38 node:test
 > cases** (`npm test` → `node --test test/*.test.mjs`) covering dispatcher / sources /
 > tasks / report / validator / config / ledger / preflight. Example config rewritten
-> to the Node schema (`agents:`/`kind:`). Remaining: drive tests toward parity,
-> `npm publish` (needs user npm/OIDC auth). **Gotcha fixed:** the stock `/bin/` Go
-> rule in `.gitignore` was excluding the package entry point — removed; never re-add it.
+> to the Node schema (`agents:`/`kind:`). **Publishing:** OIDC Trusted Publishing via
+> `.github/workflows/release.yml` (see `RELEASING.md`) — Node 24 runner, no `registry-url`,
+> `unset NODE_AUTH_TOKEN`, `npm publish --provenance`; the FIRST publish must be a manual
+> token/login bootstrap (npm has no pending-publisher). Remaining: bootstrap first publish
+> + register the trusted publisher (needs user npm auth), drive tests toward parity.
+> **Gotcha fixed:** the stock `/bin/` Go rule in `.gitignore` was excluding the package
+> entry point — removed; never re-add it.
 > **The Python `nightsweeper/` below is the REFERENCE SPEC (127 tests)** — port from
 > it; don't diverge behavior. Keep both until parity, then archive Python.
 

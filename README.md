@@ -123,7 +123,8 @@ and `todo_scan` (enrolled `TODO(nightsweeper: …)` markers only — bare TODOs 
 alone). The morning report always prints per-agent utilization and recommends downgrading
 a paid-but-underused agent. Preflight cost prediction is wired (advisory by default; an
 opt-in `preflight.mode: gate` parks chores over `per_task_cap`). **46 tests** —
-`npm test`. The next step is `npm publish` (the name `nightsweeper` is available).
+`npm test`. Publishing is set up via OIDC Trusted Publishing (no stored npm token) —
+see [`RELEASING.md`](RELEASING.md) for the one-time bootstrap + the tokenless release flow.
 
 The original Python implementation (127 tests, V1 + V2) remains under `nightsweeper/` as
 the reference spec and will be archived once the Node version is published.
