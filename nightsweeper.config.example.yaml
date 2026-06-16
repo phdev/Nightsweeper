@@ -38,6 +38,17 @@ sources:
     #   TODO(nightsweeper: validator=test value=med)
     default_value: low
 
+  # A literal task-list file you author (YAML or JSON):
+  # - name: tasklist
+  #   path: nightsweeper.tasks.yaml
+
+  # Apple Notes (macOS; needs Automation/TCC permission for headless runs).
+  # One line = one task; done items (strikethrough / [x]) are skipped; an inline
+  # tag overrides defaults, e.g. "Fix retry [validator=test value=high]":
+  # - name: apple_notes
+  #   note: "Project X Tasks"
+  #   default_validator: test
+
   # V2 source (needs $LINEAR_API_KEY):
   # - name: linear
   #   team: ENG
@@ -45,14 +56,22 @@ sources:
   #   default_validator: test
 
 backends:
-  - name: local                # the only truly-free lane ($0, unlimited)
+  # Free local lane. Two interchangeable harnesses (both $0, drive Ollama):
+  #   `aider`  — mature headless coder, stable CLI, proven end-to-end here (recommended)
+  #   `local`  — OpenClaw; co-locate with the worktree, can drive a remote Ollama
+  - name: aider                # the only truly-free lane ($0, unlimited)
     cost_rank: 0               # lower = cheaper = tried first when eligible
     model: "qwen2.5-coder:7b"  # S3-validated; Qwen3-Coder-30B is the agentic upgrade
-    ollama_host: "http://localhost:11434"
+    ollama_host: "http://localhost:11434"   # or http://<lan-ip>:11434 for a remote model
+    edit_format: whole         # robust for small models
     timeout_sec: 1800
     capability:
       validators: [test, typecheck, build, custom-cmd]
       max_complexity: medium   # set from S3's measured pass-rate-by-complexity
+  # - name: local              # OpenClaw alternative (split-host friendly)
+  #   cost_rank: 0
+  #   model: "qwen2.5-coder:7b"
+  #   ollama_host: "http://192.168.1.54:11434"
 
   - name: codex                # V2: ChatGPT-plan quota, $0 marginal, quota-gated
     cost_rank: 1               # cheaper than claude ($0 vs metered) → preferred cloud lane

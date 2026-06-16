@@ -51,8 +51,10 @@ def register_enricher(name: str) -> Callable:
 
 def register_builtins() -> None:
     """Import the V1 + V2 adapters so their decorators register them."""
-    from .backends import claude_headless, codex, local  # noqa: F401
-    from .sources import github_issues, linear, todo_scan  # noqa: F401
+    from .backends import aider, claude_headless, codex, local  # noqa: F401
+    from .sources import (  # noqa: F401
+        apple_notes, github_issues, linear, tasklist, todo_scan,
+    )
     from .enrichers import gbrain  # noqa: F401
 
 
