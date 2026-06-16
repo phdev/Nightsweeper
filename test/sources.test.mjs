@@ -1,0 +1,31 @@
+import { test } from 'node:test';
+import assert from 'node:assert';
+import { parseNotesLines, appleNotesSource } from '../lib/sources.mjs';
+
+const NOTE = '<div><h1>AI learning path</h1></div><div><h2>Reading</h2></div>'
+  + '<div>Read paper A</div><div><h2>Depthfinder</h2></div>'
+  + '<div>Add coherence dimension [validator=test value=high]</div>'
+  + '<div><s>old done thing</s></div><div>Wire warn-below gate</div>'
+  + '<div><h2>Other</h2></div><div>Not this one</div>';
+
+test('parseNotesLines detects headings + done', () => {
+  const lines = parseNotesLines(NOTE);
+  assert.ok(lines.find((l) => l.text === 'AI learning path' && l.isHeading));
+  assert.ok(lines.find((l) => l.text === 'old done thing' && l.done));
+});
+
+test('apple_notes scopes to a heading, skips done, honors inline tags', () => {
+  const s = appleNotesSource({ note: 'AI learning path', heading: 'Depthfinder' });
+  s._fetchBody = () => NOTE;
+  const tasks = s.fetch();
+  assert.deepEqual(tasks.map((t) => t.title), ['Add coherence dimension', 'Wire warn-below gate']);
+  assert.equal(tasks[0].validator, 'test');
+  assert.equal(tasks[0].value, 'high');
+  assert.equal(tasks[0].source, 'apple_notes');
+});
+
+test('apple_notes never invents work (empty note)', () => {
+  const s = appleNotesSource({ note: 'x', heading: 'Nope' });
+  s._fetchBody = () => '<div><h1>x</h1></div>';
+  assert.equal(s.fetch().length, 0);
+});
