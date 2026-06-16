@@ -4,6 +4,12 @@ Default model Qwen3-Coder-30B (NOT gemma — grounding §3: gemma is not a codin
 specialist). The model is config-driven. Every result is gated downstream on
 EXECUTABLE validation, never self-report. Tool-call loops / malformed tool calls
 surface as a dispatch failure so the dispatcher escalates rather than hanging.
+
+Split-host setup: OpenClaw runs co-located with the worktree it edits (e.g. on a
+Mac mini), while Ollama may serve the model on another LAN machine. Set
+``ollama_host`` to the remote endpoint (e.g. ``http://192.168.1.54:11434``); the
+probe checks it and OpenClaw is told to use it via the ``OLLAMA_HOST`` env var.
+The Ollama host must bind ``0.0.0.0`` (not just localhost) to be LAN-reachable.
 """
 
 from __future__ import annotations
@@ -48,10 +54,13 @@ class LocalBackend(BackendAdapter):
             "--prompt", f"{task.title}\n\n{task.body}",
             "--json",
         ]
+        env = scrubbed_env()
+        if self.ollama_host:
+            env["OLLAMA_HOST"] = self.ollama_host  # point OpenClaw at the (remote) Ollama
         try:
             out = subprocess.run(
                 cmd, capture_output=True, text=True, cwd=workdir,
-                timeout=self.timeout_sec, env=scrubbed_env(),
+                timeout=self.timeout_sec, env=env,
             )
         except FileNotFoundError:
             return False, None, "openclaw not installed (local lane unavailable)"

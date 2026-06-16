@@ -40,4 +40,27 @@ def test_dispatch_loop_failure_escalatable(monkeypatch):
     be = _be()
     monkeypatch.setattr(be, "_run_agent", lambda task, wd: (False, None, "tool-call loop"))
     r = be.dispatch(_task(), "/tmp/wd")
-    assert r.ok is False and "loop" in r.error  # dispatcher will escalate
+    assert r.ok is False and "loop" in r.error
+
+
+def test_run_agent_points_openclaw_at_remote_ollama(monkeypatch):
+    import nightsweeper.backends.local as localmod
+    be = LocalBackend(BackendConfig(
+        name="local", cost_rank=0,
+        capability=Capability(validators=frozenset({"test"}), max_complexity="medium"),
+        options={"model": "qwen2.5-coder:7b", "ollama_host": "http://192.168.1.54:11434"}))
+
+    captured = {}
+
+    class _R:
+        returncode, stdout, stderr = 0, "{}", ""
+
+    def fake_run(cmd, **kw):
+        captured.update(kw)
+        return _R()
+
+    monkeypatch.setattr(localmod.subprocess, "run", fake_run)
+    ok, _, _ = be._run_agent(_task(), "/wd")
+    assert ok is True
+    assert captured["env"]["OLLAMA_HOST"] == "http://192.168.1.54:11434"  # remote Ollama
+    assert captured["cwd"] == "/wd"  # dispatcher will escalate
