@@ -46,7 +46,8 @@ sources:
   # One line = one task; done items (strikethrough / [x]) are skipped; an inline
   # tag overrides defaults, e.g. "Fix retry [validator=test value=high]":
   # - name: apple_notes
-  #   note: "Project X Tasks"
+  #   note: "AI learning path"
+  #   heading: Depthfinder    # optional: only items under this heading become tasks
   #   default_validator: test
 
   # V2 source (needs $LINEAR_API_KEY):
@@ -100,6 +101,15 @@ validators:
   test: "pytest -q"
   typecheck: "mypy ."
   build: "make build"
+
+# Adjudication gates (multi-validator): run AFTER a task's functional validator
+# passes; ALL must hold for the task to pass, and each is reported separately. A
+# task that passes its tests but fails a gate is kept OUT of a passing branch —
+# so the agent can't "pass" by degrading the codebase.
+# gates:
+#   - name: depthfinder
+#     cmd: "npx depthfinder scan . --warn-below 0.85"
+#     required: true       # set false to skip silently when the command isn't installed
 
 isolation:
   worktree_dir: ".nightsweeper/worktrees"

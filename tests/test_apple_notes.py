@@ -53,3 +53,28 @@ def test_leading_checkbox_marker_is_done(monkeypatch):
     monkeypatch.setattr(s, "_fetch_body",
                         lambda: "<div>Title</div><div>[x] already done</div><div>real task</div>")
     assert [t.title for t in s.fetch()] == ["real task"]
+
+
+NOTE_WITH_HEADINGS = (
+    "<div><h1>AI learning path</h1></div>"
+    "<div><h2>Reading</h2></div>"
+    "<div>Read paper A</div>"
+    "<div><h2>Depthfinder</h2></div>"
+    "<div>Add coherence dimension [validator=test value=high]</div>"
+    "<div><s>old depthfinder task</s></div>"
+    "<div>Wire warn-below gate</div>"
+    "<div><h2>Other</h2></div>"
+    "<div>Not this one</div>"
+)
+
+
+def test_scopes_to_a_heading(monkeypatch):
+    s = AppleNotesSource(SourceConfig(name="apple_notes",
+                                      options={"note": "AI learning path", "heading": "Depthfinder"}))
+    monkeypatch.setattr(s, "_fetch_body", lambda: NOTE_WITH_HEADINGS)
+    tasks = s.fetch()
+    titles = [t.title for t in tasks]
+    assert titles == ["Add coherence dimension", "Wire warn-below gate"]  # only under Depthfinder
+    assert "Read paper A" not in titles and "Not this one" not in titles
+    assert "old depthfinder task" not in titles                          # done, skipped
+    assert tasks[0].validator == "test" and tasks[0].value == "high"     # inline tag honored

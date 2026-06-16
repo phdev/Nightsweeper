@@ -149,16 +149,19 @@ class Dispatcher:
                     return
 
                 tried.add(lane.name)
+                # encode an adjudication-gate rejection so the report can break it out
+                vres = (f"failed:gate:{validation.failed_gate}"
+                        if getattr(validation, "failed_gate", None) else FAILED)
                 next_elig = [] if escalated else self.eligible_lanes(task, exclude=tried)
                 if next_elig:
-                    self._record(task, lane.name, FAILED, False, escalated, None, None,
+                    self._record(task, lane.name, vres, False, escalated, None, None,
                                  result.consumed_usd, plo, phi)
                     self.isolation.cleanup(task, keep=False)
                     escalated = True
                     continue
                 reason = "escalation-exhausted" if escalated else "no-escalation-lane"
                 self.isolation.cleanup(task, keep=True)
-                self._record(task, lane.name, FAILED, False, escalated, None, reason,
+                self._record(task, lane.name, vres, False, escalated, None, reason,
                              result.consumed_usd, plo, phi)
                 return
             except Exception as e:  # one task must never crash the night

@@ -25,7 +25,7 @@ def test_example_config_loads():
         c = cfg.load(EXAMPLE)
     assert c.caps.nightly_task_cap == 20
     assert c.caps.nightly_dollar_cap == 5.0
-    assert c.backend("local").cost_rank == 0
+    assert c.backend("aider").cost_rank == 0
     assert c.backend("claude").options["nightly_budget"] == 3.0
     assert c.isolation.pr_opt_in is False
 

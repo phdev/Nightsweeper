@@ -93,6 +93,16 @@ class Preflight:
 
 
 @dataclass
+class Gate:
+    """An adjudication validator that runs AFTER a task's functional validator
+    passes. ALL gates must hold for a task to pass; each is reported separately.
+    E.g. a Depthfinder health gate. ``required: false`` skips a missing command."""
+    name: str
+    cmd: str
+    required: bool = True
+
+
+@dataclass
 class Config:
     sources: list
     backends: list
@@ -103,6 +113,7 @@ class Config:
     schedule: Schedule
     enrichers: list = field(default_factory=list)
     preflight: Preflight = field(default_factory=Preflight)
+    gates: list = field(default_factory=list)
 
     def backend(self, name: str) -> BackendConfig:
         for b in self.backends:
@@ -216,6 +227,13 @@ def parse(raw: dict) -> Config:
     preflight = _construct(Preflight, raw.get("preflight", {}), "preflight")
     if preflight.mode not in ("advisory", "gate"):
         raise ConfigError(f"preflight.mode {preflight.mode!r} not in ('advisory','gate')")
+    gates = []
+    for g in raw.get("gates", []):
+        _require(g, "name", "gate")
+        _require(g, "cmd", "gate")
+        gates.append(_construct(Gate, g, f"gate '{g['name']}'"))
+    if len({g.name for g in gates}) != len(gates):
+        raise ConfigError("gates: names must be unique")
 
     return Config(
         sources=sources,
@@ -227,4 +245,5 @@ def parse(raw: dict) -> Config:
         schedule=schedule,
         enrichers=enrichers,
         preflight=preflight,
+        gates=gates,
     )

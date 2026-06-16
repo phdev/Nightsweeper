@@ -90,7 +90,7 @@ def cmd_run(args) -> int:
         tasks = [t for t in tasks if not ledger.has_run(t.id)]
 
         iso = WorktreeManager(root, cfg.isolation, repo_slug=_repo_slug())
-        validator = Validator(cfg.validators)
+        validator = Validator(cfg.validators, gates=cfg.gates)
         enrichers = registry.build_enrichers(cfg)
         enricher = (enrichers[0] if len(enrichers) == 1
                     else (CompositeEnricher(enrichers) if enrichers else None))

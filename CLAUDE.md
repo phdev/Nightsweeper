@@ -23,7 +23,7 @@ nightsweeper/
                    apple_notes.py (osascript), linear.py [V2]
   enrichers/       gbrain.py [V2] read-only context (no-op without MCP) + CompositeEnricher
   isolation.py     git worktree per task; push-then-optional-PR; cleanup+prune
-  validator.py     run the configured validator in the worktree (executable; none→park)
+  validator.py     functional validator + adjudication gates (multi-validator, e.g. Depthfinder)
   dispatcher.py    THE CORE IP — value order, capability gate, cost_rank select,
                    escalate-once-then-park, hard stops + early-stop
   report.py        morning report; always-on utilization + defined downgrade metric
@@ -65,7 +65,7 @@ Linear, Gbrain, preflight) with no signature or schema change.
 
 ## Testing
 
-`.venv/bin/python -m pytest -q` (104 tests). Aider lane proven end-to-end on a real
+`.venv/bin/python -m pytest -q` (114 tests). Aider lane proven end-to-end on a real
 worktree (tasklist → Aider+Qwen → validated branch). Adapters take injectable subprocess
 seams (`_gh`, `_run_agent`, `_run_claude`, `_git`, `_run`) so logic is unit-tested
 without live CLIs. `tests/conftest.py` holds the dispatcher/report test doubles;

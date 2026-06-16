@@ -28,6 +28,8 @@ _TAG = re.compile(r"<[^>]+>")
 _DONE_PREFIX = re.compile(r"^\s*(?:\[x\]|✓|✔)\s*", re.IGNORECASE)
 _STRIKE = re.compile(r"(?i)<s>|<strike>|line-through")
 _INLINE = re.compile(r"\[([^\]]*)\]\s*$")
+# Notes renders Title/Heading/Subheading as <h1>-<h6> or bold standalone lines.
+_HEADING = re.compile(r"(?i)<h[1-6][ >]|<b>|<strong>|font-weight:\s*(?:bold|[6-9]00)")
 
 
 class SourceFetchError(RuntimeError):
@@ -40,6 +42,7 @@ class AppleNotesSource(BacklogSource):
         o = cfg.options
         self.note = o.get("note")
         self.folder = o.get("folder")
+        self.heading = o.get("heading")  # scope to items under this heading only
         self.default_value = o.get("default_value", "med")
         self.default_validator = o.get("default_validator", "test")
         self.include_done = o.get("include_done", False)
@@ -65,13 +68,14 @@ class AppleNotesSource(BacklogSource):
         out = []
         for raw in s.split("\n"):
             done = bool(_STRIKE.search(raw))
+            is_heading = bool(_HEADING.search(raw))
             text = html.unescape(_TAG.sub("", raw)).strip()
             if not text:
                 continue
             if _DONE_PREFIX.match(text):
                 done = True
                 text = _DONE_PREFIX.sub("", text)
-            out.append((text, done))
+            out.append((text, done, is_heading))
         return out
 
     def _to_task(self, text: str) -> Task:
@@ -94,7 +98,22 @@ class AppleNotesSource(BacklogSource):
 
     def fetch(self) -> list:
         lines = self._lines(self._fetch_body())
-        if self.skip_title and lines:
-            lines = lines[1:]  # first line is the note title
-        return [self._to_task(text) for text, done in lines
+        if self.heading:
+            # collect only the items under the matching heading, until the next heading
+            target = self.heading.strip().lower()
+            items, collecting = [], False
+            for text, done, is_heading in lines:
+                if is_heading:
+                    if text.strip().lower().startswith(target):
+                        collecting = True
+                    elif collecting:
+                        break  # the next heading ends the section
+                    continue
+                if collecting:
+                    items.append((text, done))
+        else:
+            if self.skip_title and lines:
+                lines = lines[1:]  # first line is the note title
+            items = [(t, d) for t, d, _ in lines]
+        return [self._to_task(text) for text, done in items
                 if not (done and not self.include_done)]

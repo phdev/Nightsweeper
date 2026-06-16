@@ -121,6 +121,19 @@ def generate(config, ledger, summary, inventory: dict, night_start: str) -> str:
             f"capacity you are not using."
         )
 
+    # Adjudication gates (multi-validator): functional-pass changes a gate rejected.
+    gate_fails = {}
+    for r in rows:
+        vr = r["validation_result"]
+        if isinstance(vr, str) and vr.startswith("failed:gate:"):
+            name = vr[len("failed:gate:"):]
+            gate_fails[name] = gate_fails.get(name, 0) + 1
+    if gate_fails:
+        lines += ["", "## Adjudication gates"]
+        for name, count in sorted(gate_fails.items()):
+            lines.append(f"- **{name}** gate rejected {count} change(s) that passed their "
+                         f"functional check — kept out of a passing branch.")
+
     # Preflight accuracy (V2): renders once predicted_lo/hi are populated.
     pred_rows = [r for r in rows if r["predicted_lo"] is not None
                  and r["validation_result"] in ("passed", "failed")]
