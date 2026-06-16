@@ -38,7 +38,9 @@ sources:
     #   TODO(nightsweeper: validator=test value=med)
     default_value: low
 
-  # A literal task-list file you author (YAML or JSON):
+  # A literal task-list file you author (YAML or JSON). Each entry may carry a
+  # per-task `validator_cmd` (a shell command that exits 0 iff the task is done),
+  # which makes the task a custom-cmd validator — the agent-ready forcing function.
   # - name: tasklist
   #   path: nightsweeper.tasks.yaml
 

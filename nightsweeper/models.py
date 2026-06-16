@@ -45,6 +45,9 @@ class Task:
     est_context_tokens: Optional[int]  # dormant in V1; read by V2 estimate()
     validator: str  # one of VALIDATORS
     value: str  # one of VALUES
+    # optional per-task command for validator=='custom-cmd' (else the global
+    # validators[<type>] command is used). Additive; sources that don't set it pass None.
+    validator_cmd: Optional[str] = None
 
     def __post_init__(self) -> None:
         if self.validator not in VALIDATORS:

@@ -65,7 +65,7 @@ Linear, Gbrain, preflight) with no signature or schema change.
 
 ## Testing
 
-`.venv/bin/python -m pytest -q` (114 tests). Aider lane proven end-to-end on a real
+`.venv/bin/python -m pytest -q` (116 tests). Aider lane proven end-to-end on a real
 worktree (tasklist → Aider+Qwen → validated branch). Adapters take injectable subprocess
 seams (`_gh`, `_run_agent`, `_run_claude`, `_git`, `_run`) so logic is unit-tested
 without live CLIs. `tests/conftest.py` holds the dispatcher/report test doubles;

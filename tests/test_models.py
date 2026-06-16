@@ -18,12 +18,15 @@ def _task(**kw):
     return Task(**base)
 
 
-def test_task_has_all_eight_fields():
+def test_task_has_core_fields():
     t = _task()
+    # the 8 brief-required fields, plus the optional additive validator_cmd
     assert set(vars(t)) == {
         "id", "source", "title", "body",
         "est_complexity", "est_context_tokens", "validator", "value",
+        "validator_cmd",
     }
+    assert t.validator_cmd is None  # optional; defaults to None
 
 
 def test_task_rejects_bad_validator():

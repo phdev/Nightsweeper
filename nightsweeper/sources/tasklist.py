@@ -55,11 +55,14 @@ class TaskListSource(BacklogSource):
         complexity = entry.get("est_complexity", "low")
         if complexity not in COMPLEXITIES:
             complexity = "low"
+        validator_cmd = entry.get("validator_cmd")
+        if validator_cmd:
+            validator = "custom-cmd"  # a per-task command implies a custom-cmd validator
         return Task(
             id=str(tid), source="tasklist", title=title, body=body,
             est_complexity=complexity,
             est_context_tokens=entry.get("est_context_tokens") or max(1, len(body) // 4),
-            validator=validator, value=value,
+            validator=validator, value=value, validator_cmd=validator_cmd,
         )
 
     def fetch(self) -> list:

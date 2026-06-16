@@ -138,7 +138,7 @@ def cmd_report(args) -> int:
 
 def cmd_install_scheduler(args) -> int:
     from .scheduling.install import install
-    return install(configmod.load(args.config))
+    return install(configmod.load(args.config), config_path=args.config)
 
 
 def main(argv=None) -> int:

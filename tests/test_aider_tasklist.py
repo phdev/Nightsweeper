@@ -111,3 +111,28 @@ def test_tasklist_coerces_bad_values(tmp_path):
     f.write_text("- title: x\n  validator: bogus\n  value: nope\n  est_complexity: huge\n")
     t = _src(f).fetch()[0]
     assert t.validator == "test" and t.value == "med" and t.est_complexity == "low"
+
+
+def test_tasklist_per_task_validator_cmd(tmp_path):
+    f = tmp_path / "t.yaml"
+    f.write_text("- id: docfix\n  title: fix doc\n  validator_cmd: \"grep -q 141 README.md\"\n")
+    t = _src(f).fetch()[0]
+    assert t.validator == "custom-cmd"               # implied by validator_cmd
+    assert t.validator_cmd == "grep -q 141 README.md"
+
+
+def test_validator_runs_per_task_command(monkeypatch):
+    from nightsweeper.models import Task
+    from nightsweeper.validator import PASSED, Validator
+    v = Validator({"custom-cmd": "GLOBAL"})           # global custom-cmd would be "GLOBAL"
+    seen = {}
+
+    class _R:
+        returncode = 0
+
+    monkeypatch.setattr(v, "_run", lambda cmd, wd: seen.update(cmd=cmd) or _R())
+    t = Task(id="t", source="tasklist", title="x", body="y", est_complexity="low",
+             est_context_tokens=1, validator="custom-cmd", value="high",
+             validator_cmd="MY-TASK-CMD")
+    assert v.validate(t, "/wd").result == PASSED
+    assert seen["cmd"] == "MY-TASK-CMD"               # per-task command, not the global one

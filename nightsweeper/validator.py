@@ -56,7 +56,11 @@ class Validator:
     def validate(self, task, workdir: str) -> ValidationResult:
         if task.validator == "none":
             return ValidationResult(PARKED, "validator:none — no automated pass signal; parked")
-        command = self.validators.get(task.validator)
+        # per-task custom command takes precedence over the global validators map
+        if task.validator == "custom-cmd" and getattr(task, "validator_cmd", None):
+            command = task.validator_cmd
+        else:
+            command = self.validators.get(task.validator)
         if not command:
             return ValidationResult(FAILED, f"no command configured for validator '{task.validator}'")
         try:
