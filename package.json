@@ -1,0 +1,31 @@
+{
+  "name": "nightsweeper",
+  "version": "0.1.0",
+  "description": "A local-first, capacity-aware overnight scheduler that dispatches a real backlog to your idle AI agents (Qwen, Codex, Claude), validates each result, and writes a morning report.",
+  "type": "module",
+  "bin": {
+    "nightsweeper": "./bin/nightsweeper.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "nightsweeper.config.example.yaml"
+  ],
+  "dependencies": {
+    "@inquirer/prompts": "^7.2.0",
+    "yaml": "^2.6.0"
+  },
+  "keywords": [
+    "ai-agents",
+    "overnight",
+    "scheduler",
+    "claude",
+    "codex",
+    "ollama",
+    "local-first"
+  ],
+  "license": "MIT"
+}

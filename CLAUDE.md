@@ -1,5 +1,13 @@
 # CLAUDE.md — Nightsweeper repo notes for coding agents
 
+> **⚠ Node rewrite in progress (npm-native product).** The future home is `lib/*.mjs`
+> + `bin/nightsweeper.mjs` + `package.json` (deps: `@inquirer/prompts`, `yaml`; JSONL
+> ledger). It calls the lanes "**agents**" (qwen/codex/claude). Phase 1 done: hub,
+> setup wizard, agents+energy, readiness, dispatcher/validator/gates/isolation, report.
+> Phase 2: github/apple_notes/linear sources, preflight, full test port → parity →
+> `npm publish`. **The Python `nightsweeper/` below is the REFERENCE SPEC (127 tests)**
+> — port from it; don't diverge behavior. Keep both until parity, then archive Python.
+
 Local-first, capacity-aware overnight scheduler. **Python 3.10+ stdlib + PyYAML.**
 Read `docs/plans/2026-06-15-001-feat-nightsweeper-overnight-scheduler-plan.md` (the
 build plan, V1 detail + V2 roadmap) and `docs/brainstorms/2026-06-15-nightsweeper-requirements.md`
