@@ -9,8 +9,18 @@
   "engines": {
     "node": ">=20"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/phdev/Nightsweeper.git"
+  },
+  "homepage": "https://github.com/phdev/Nightsweeper#readme",
+  "bugs": {
+    "url": "https://github.com/phdev/Nightsweeper/issues"
+  },
+  "author": "phdev",
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "prepublishOnly": "node --test test/*.test.mjs"
   },
   "files": [
     "bin/",

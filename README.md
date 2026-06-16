@@ -115,12 +115,17 @@ Runs under `caffeinate` so the Mac stays awake; reports land in your repo each m
 
 ## Status
 
-**Node rewrite in progress (npm-native).** This version is Phase 1: the interactive hub,
-onboarding, agents + energy, chore-readiness, and the dispatcher / validator / gates /
-git-isolation / report engine — all native Node, no Python. Phase 2: the remaining
-backlog sources (GitHub issues, Apple Notes, Linear), preflight cost prediction, the
-full test-suite port to parity, then `npm publish`. The original Python implementation
-(127 tests, V1 + V2) is the reference spec under `nightsweeper/` until the Node version
-reaches parity.
+**Node rewrite — feature-complete, pending first publish.** Native Node (no Python at
+runtime): the interactive hub, onboarding wizard, agents + energy, chore-readiness, and
+the dispatcher / validator / adjudication-gates / git-isolation / report engine. Backlog
+sources: an authored `tasks_file`, GitHub issues, Apple Notes (heading-scoped), Linear,
+and `todo_scan` (enrolled `TODO(nightsweeper: …)` markers only — bare TODOs are left
+alone). The morning report always prints per-agent utilization and recommends downgrading
+a paid-but-underused agent. Preflight cost prediction is wired (advisory by default; an
+opt-in `preflight.mode: gate` parks chores over `per_task_cap`). **46 tests** —
+`npm test`. The next step is `npm publish` (the name `nightsweeper` is available).
+
+The original Python implementation (127 tests, V1 + V2) remains under `nightsweeper/` as
+the reference spec and will be archived once the Node version is published.
 
 See `CLAUDE.md` for the architecture.
