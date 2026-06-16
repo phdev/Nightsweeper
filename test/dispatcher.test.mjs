@@ -38,3 +38,42 @@ test('zero chores → no run', async () => {
   assert.equal(s.tasks_total, 0);
   assert.equal(s.dispatched, 0);
 });
+
+test('value orders the backlog — high before low, regardless of arrival order', async () => {
+  const ledger = fakeLedger();
+  const agent = { name: 'qwen', costRank: 0, capability: cap, probe: async () => ({ available: true }), dispatch: () => ({ ok: true, consumedUsd: 0 }) };
+  const d = new Dispatcher([agent], fakeIso, { validate: () => ({ result: 'passed' }) }, ledger, { caps: { nightly_task_cap: 5, nightly_dollar_cap: 5 } });
+  await d.run([task('lo', 'low'), task('hi', 'high'), task('mid', 'med')]);
+  assert.deepEqual(ledger.rows.map((r) => r.task_id), ['hi', 'mid', 'lo']);
+});
+
+test('nightly task cap stops the night', async () => {
+  const ledger = fakeLedger();
+  const agent = { name: 'qwen', costRank: 0, capability: cap, probe: async () => ({ available: true }), dispatch: () => ({ ok: true, consumedUsd: 0 }) };
+  const d = new Dispatcher([agent], fakeIso, { validate: () => ({ result: 'passed' }) }, ledger, { caps: { nightly_task_cap: 2, nightly_dollar_cap: 5 } });
+  const s = await d.run([task('a'), task('b'), task('c'), task('d')]);
+  assert.equal(s.stop_reason, 'nightly-task-cap');
+  assert.equal(s.dispatched, 2);
+});
+
+test('nightly dollar cap stops the night', async () => {
+  const ledger = fakeLedger();
+  const agent = { name: 'claude', costRank: 0, capability: cap, probe: async () => ({ available: true }), dispatch: () => ({ ok: true, consumedUsd: 1 }) };
+  const d = new Dispatcher([agent], fakeIso, { validate: () => ({ result: 'passed' }) }, ledger, { caps: { nightly_task_cap: 10, nightly_dollar_cap: 2 } });
+  const s = await d.run([task('a'), task('b'), task('c'), task('d')]);
+  assert.equal(s.stop_reason, 'nightly-dollar-cap');
+  assert.ok(s.dispatched <= 3);   // stops once cumulative spend reaches the cap
+});
+
+test('a chore no agent can handle is parked, not dropped', async () => {
+  const ledger = fakeLedger();
+  const weak = { name: 'qwen', costRank: 0, capability: { validators: ['test'], max_complexity: 'low' }, probe: async () => ({ available: true }), dispatch: () => ({ ok: true, consumedUsd: 0 }) };
+  const d = new Dispatcher([weak], fakeIso, { validate: () => ({ result: 'passed' }) }, ledger, { caps: { nightly_task_cap: 5, nightly_dollar_cap: 5 } });
+  // 'big' is too complex for the only agent; 'small' is fine. big sorts first (high value).
+  const big = { ...task('big', 'high'), est_complexity: 'high' };
+  const small = task('small', 'low');
+  await d.run([big, small]);
+  const bigRow = ledger.rows.find((r) => r.task_id === 'big');
+  assert.equal(bigRow.park_reason, 'no-eligible-agent');
+  assert.equal(ledger.rows.find((r) => r.task_id === 'small').passed, true);
+});

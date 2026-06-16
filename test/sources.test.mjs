@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { parseNotesLines, appleNotesSource } from '../lib/sources.mjs';
+import { parseNotesLines, appleNotesSource, todoScanSource } from '../lib/sources.mjs';
 
 const NOTE = '<div><h1>AI learning path</h1></div><div><h2>Reading</h2></div>'
   + '<div>Read paper A</div><div><h2>Depthfinder</h2></div>'
@@ -27,5 +27,37 @@ test('apple_notes scopes to a heading, skips done, honors inline tags', () => {
 test('apple_notes never invents work (empty note)', () => {
   const s = appleNotesSource({ note: 'x', heading: 'Nope' });
   s._fetchBody = () => '<div><h1>x</h1></div>';
+  assert.equal(s.fetch().length, 0);
+});
+
+test('todo_scan only enrolls deliberate markers; bare TODOs ignored; tags parsed', () => {
+  const FILE = [
+    'function a() {',
+    '  // TODO: bare one, not enrolled — must be left alone',
+    '  // TODO(nightsweeper: validator=test value=high) wire the retry path',
+    '  // TODO(nightsweeper: validator=build value=low)',
+    '}',
+  ].join('\n');
+  const s = todoScanSource({ root: '/repo' });
+  s._files = () => ['/repo/src/a.js'];
+  s._read = () => FILE;
+  const tasks = s.fetch();
+  assert.equal(tasks.length, 2);
+  const wired = tasks.find((t) => t.title === 'wire the retry path');
+  assert.equal(wired.validator, 'test');
+  assert.equal(wired.value, 'high');
+  assert.equal(wired.source, 'todo_scan');
+  // a marker with no trailing text falls back to a located description, keeps its tags
+  const fallback = tasks.find((t) => t.title.startsWith('Resolve enrolled TODO'));
+  assert.ok(fallback);
+  assert.match(fallback.title, /src\/a\.js:4/);
+  assert.equal(fallback.validator, 'build');
+  assert.equal(fallback.value, 'low');
+});
+
+test('todo_scan returns nothing when no enrolled markers exist', () => {
+  const s = todoScanSource({ root: '/repo' });
+  s._files = () => ['/repo/x.js'];
+  s._read = () => '// TODO: just a normal todo\n// FIXME: and a fixme\n';
   assert.equal(s.fetch().length, 0);
 });

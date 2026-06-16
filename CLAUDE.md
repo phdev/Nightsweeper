@@ -4,9 +4,17 @@
 > + `bin/nightsweeper.mjs` + `package.json` (deps: `@inquirer/prompts`, `yaml`; JSONL
 > ledger). It calls the lanes "**agents**" (qwen/codex/claude). Phase 1 done: hub,
 > setup wizard, agents+energy, readiness, dispatcher/validator/gates/isolation, report.
-> Phase 2: github/apple_notes/linear sources, preflight, full test port → parity →
-> `npm publish`. **The Python `nightsweeper/` below is the REFERENCE SPEC (127 tests)**
-> — port from it; don't diverge behavior. Keep both until parity, then archive Python.
+> Phase 2 (in progress): backlog sources `github_issues` / `apple_notes` (heading
+> scoping) / `linear` / `todo_scan` (enrolled `TODO(nightsweeper: validator=X value=Y)`
+> markers only — bare TODOs ignored); report **downgrade recommendation** (paid-but-
+> underused agent, pass-per-$ first-class); `run --choose-lanes` interactive agent
+> picker. **32 node:test cases** (`npm test` → `node --test test/*.test.mjs`) covering
+> dispatcher / sources / tasks / report / validator / config / ledger. Remaining:
+> preflight (advisory cost model + `predicted_lo/hi`), drive tests toward parity,
+> `npm publish` (needs user npm/OIDC auth). **Gotcha fixed:** the stock `/bin/` Go
+> rule in `.gitignore` was excluding the package entry point — removed; never re-add it.
+> **The Python `nightsweeper/` below is the REFERENCE SPEC (127 tests)** — port from
+> it; don't diverge behavior. Keep both until parity, then archive Python.
 
 Local-first, capacity-aware overnight scheduler. **Python 3.10+ stdlib + PyYAML.**
 Read `docs/plans/2026-06-15-001-feat-nightsweeper-overnight-scheduler-plan.md` (the
