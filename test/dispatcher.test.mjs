@@ -65,6 +65,30 @@ test('nightly dollar cap stops the night', async () => {
   assert.ok(s.dispatched <= 3);   // stops once cumulative spend reaches the cap
 });
 
+test('preflight gate (opt-in) parks a chore whose estimate blows the per-task cap', async () => {
+  const ledger = fakeLedger();
+  const pricey = { name: 'claude', costRank: 0, capability: cap, probe: async () => ({ available: true }),
+    estimate: () => ({ lo: 0.5, hi: 1.2 }), dispatch: () => ({ ok: true, consumedUsd: 0.5 }) };
+  const d = new Dispatcher([pricey], fakeIso, { validate: () => ({ result: 'passed' }) }, ledger,
+    { caps: { nightly_task_cap: 5, nightly_dollar_cap: 5, per_task_cap: 0.1 }, preflight: { mode: 'gate' } });
+  const s = await d.run([task('t1')]);
+  assert.equal(s.dispatched, 0);
+  assert.match(ledger.rows[0].park_reason, /over-per-task-cap/);
+  assert.equal(ledger.rows[0].predicted_lo, 0.5);
+});
+
+test('advisory mode (default) never gates — it only records predictions', async () => {
+  const ledger = fakeLedger();
+  const pricey = { name: 'claude', costRank: 0, capability: cap, probe: async () => ({ available: true }),
+    estimate: () => ({ lo: 0.5, hi: 1.2 }), dispatch: () => ({ ok: true, consumedUsd: 0.5 }) };
+  const d = new Dispatcher([pricey], fakeIso, { validate: () => ({ result: 'passed' }) }, ledger,
+    { caps: { nightly_task_cap: 5, nightly_dollar_cap: 5, per_task_cap: 0.1 } });   // no preflight block → advisory
+  const s = await d.run([task('t1')]);
+  assert.equal(s.passed, 1);
+  assert.equal(ledger.rows[0].predicted_lo, 0.5);
+  assert.equal(ledger.rows[0].predicted_hi, 1.2);
+});
+
 test('a chore no agent can handle is parked, not dropped', async () => {
   const ledger = fakeLedger();
   const weak = { name: 'qwen', costRank: 0, capability: { validators: ['test'], max_complexity: 'low' }, probe: async () => ({ available: true }), dispatch: () => ({ ok: true, consumedUsd: 0 }) };

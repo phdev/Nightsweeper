@@ -8,9 +8,12 @@
 > scoping) / `linear` / `todo_scan` (enrolled `TODO(nightsweeper: validator=X value=Y)`
 > markers only — bare TODOs ignored); report **downgrade recommendation** (paid-but-
 > underused agent, pass-per-$ first-class); `run --choose-lanes` interactive agent
-> picker. **32 node:test cases** (`npm test` → `node --test test/*.test.mjs`) covering
-> dispatcher / sources / tasks / report / validator / config / ledger. Remaining:
-> preflight (advisory cost model + `predicted_lo/hi`), drive tests toward parity,
+> picker; **preflight** cost model (`lib/preflight.mjs`: `cost_model` → `{lo,hi}`,
+> dormant in V1; advisory records `predicted_lo/hi` + report bracket-accuracy line;
+> opt-in `preflight.mode: gate` parks over-`per_task_cap` chores). **38 node:test
+> cases** (`npm test` → `node --test test/*.test.mjs`) covering dispatcher / sources /
+> tasks / report / validator / config / ledger / preflight. Example config rewritten
+> to the Node schema (`agents:`/`kind:`). Remaining: drive tests toward parity,
 > `npm publish` (needs user npm/OIDC auth). **Gotcha fixed:** the stock `/bin/` Go
 > rule in `.gitignore` was excluding the package entry point — removed; never re-add it.
 > **The Python `nightsweeper/` below is the REFERENCE SPEC (127 tests)** — port from

@@ -38,6 +38,12 @@ test('valid config loads with sane defaults + downgrade policy', () => {
   assert.deepEqual(c.sources, []);
 });
 
+test('preflight defaults to advisory; an unknown mode is rejected', () => {
+  assert.equal(loadConfig(write(BASE)).preflight.mode, 'advisory');
+  assert.equal(loadConfig(write(BASE + 'preflight:\n  mode: gate\n')).preflight.mode, 'gate');
+  assert.throws(() => loadConfig(write(BASE + 'preflight:\n  mode: bogus\n')), /preflight\.mode/);
+});
+
 test('user report settings merge without clobbering downgrade defaults', () => {
   const c = loadConfig(write(BASE + 'report:\n  path: out.md\n  downgrade:\n    min_passes: 1\n'));
   assert.equal(c.report.path, 'out.md');
