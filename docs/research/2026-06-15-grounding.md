@@ -183,3 +183,39 @@ No 20-task predicted-vs-actual replay exists yet, so preflight cannot clear the
 records `predicted_lo/hi` and the report shows a bracket-accuracy line, but the
 per-task-cost-cap **gate** is opt-in (`preflight.mode: gate`) and stays off until
 the operator's own replay clears 70%.
+
+## Billing watch (verified 2026-06-16) + reversal tripwire
+
+**Verified current state.** As of **2026-06-16** (the day after the change) there is
+**no walk-back, delay, or amendment** of the June 15 split: headless `claude -p` /
+Agent SDK draws the separate metered credit, not the flat 5h/weekly subscription
+pool. Sources: support.claude.com/en/articles/15036540; thenewstack.io/anthropic-agent-sdk-credits;
+techtimes.com (2026-06-02). The June-15 *credit* model is itself Anthropic's
+concession after the harsher **April 4 2026** total ban on third-party agents (they
+"brought agents back" via credits).
+
+**Reversal is plausible — Anthropic has a pattern.** A January 2026 OAuth-token
+restriction was reversed within days after backlash. So treat the metered-credit
+state as **possibly temporary**.
+
+**Tripwire (re-check before trusting the Claude lane's economics).** Re-verify
+periodically: does headless `claude -p` once again draw the flat subscription pool?
+If a walk-back lands, the Claude lane flips from *metered escalation* to *free
+frontier lane* with a **config change, never code**:
+
+- promote `cost_rank` (free + frontier → preferred escalation),
+- delete `nightly_budget` / `per_task_floor` / `cost_model` (no longer metered),
+- keep `permission_mode: skip`.
+
+The dispatcher, ledger, isolation, validator, and the budget-fallback probe are
+unchanged — the adapter seam absorbs the shift. **Until confirmed, the $0 path is
+`qwen (local) → codex (ChatGPT quota)`;** Claude stays a pre-paid-credit option,
+togglable per run via `--choose-lanes` / `--lanes`.
+
+## Lane economics summary (as built)
+
+| Lane | Marginal cost | Source of capacity | Probe |
+|---|---|---|---|
+| local (aider/openclaw + Qwen) | **$0** | the machine | Ollama up? |
+| codex (`codex exec`) | **$0** | ChatGPT Plus/Pro quota | scrape `~/.codex/sessions` rate_limits |
+| claude (`claude -p`) | metered (pre-paid Agent SDK credit) | $20/$100/$200 monthly credit | budget-fallback (no live read — S2) |
