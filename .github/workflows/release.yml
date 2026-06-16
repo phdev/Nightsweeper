@@ -1,0 +1,86 @@
+name: Release (npm publish via OIDC Trusted Publishing)
+
+# Publishes the `nightsweeper` package to npm with NO long-lived NPM_TOKEN.
+# Auth is a short-lived GitHub OIDC id-token that npm exchanges for publish
+# rights, based on the Trusted Publisher you register on npmjs.com
+# (owner: phdev, repo: Nightsweeper, workflow file: release.yml).
+#
+# IMPORTANT: the very FIRST publish of `nightsweeper` cannot use this workflow.
+# npm has no PyPI-style "pending publisher", so the Trusted Publisher settings
+# page only appears once the package already exists on the registry. Bootstrap
+# that one publish with a short-lived token / `npm login`, register the Trusted
+# Publisher, revoke the token — then every release after that runs here,
+# tokenless. See RELEASING.md.
+
+on:
+  # Publish when you cut a GitHub Release (tag the version, then "Publish release").
+  release:
+    types: [published]
+  # Allow manual runs from the Actions tab (e.g. to re-attempt a failed publish).
+  workflow_dispatch:
+
+permissions:
+  # REQUIRED: lets GitHub Actions mint the OIDC id-token that npm trusts.
+  # Without it no token is minted and the publish fails with a misleading
+  # 404 / ENEEDAUTH.
+  id-token: write
+  # Needed for actions/checkout to read the repo contents.
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to npm
+    # MUST be a GitHub-hosted runner; self-hosted runners are not supported for
+    # npm trusted publishing.
+    runs-on: ubuntu-latest
+    steps:
+      # Check out the repo so test/ and package-lock.json are present
+      # (prepublishOnly re-runs the test suite during `npm publish`).
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Node 24 is REQUIRED by npm trusted publishing: the official docs require
+      # npm CLI >= 11.5.1 AND Node >= 22.14.0, and field reports show Node 24 is
+      # the reliable choice (Node 20/22 can fail OIDC with a misleading E404).
+      # This is the CI RUNNER version — independent of the package's own
+      # engines.node>=20 install-time floor.
+      #
+      # Note: we deliberately do NOT set `registry-url`. That input makes
+      # setup-node write an .npmrc line
+      #   //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}
+      # plus always-auth=true, which forces npm onto the legacy token path and
+      # breaks OIDC. npm publishes to the public registry by default anyway.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # Node 24 ships npm 11.x, but pin to latest as belt-and-suspenders: npm
+      # below 11.5.1 silently fails to use trusted publishing.
+      - name: Upgrade npm for OIDC trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      # Reproducible install from the committed package-lock.json.
+      - name: Install dependencies
+        run: npm ci
+
+      # Run the node:test suite. (npm also re-runs these via prepublishOnly
+      # during `npm publish`, but running here surfaces failures earlier.)
+      - name: Run tests
+        run: npm test
+
+      # Publish via OIDC. No NODE_AUTH_TOKEN / NPM_TOKEN is set anywhere; we also
+      # `unset NODE_AUTH_TOKEN` for this step's shell as defense-in-depth, since
+      # an EMPTY token is still a value that pushes npm onto the legacy token
+      # path (ENEEDAUTH/404). With it absent, npm uses the GitHub OIDC id-token
+      # + the registered Trusted Publisher.
+      # --provenance is explicit: docs say provenance is automatic under trusted
+      # publishing, but field reports vary; the flag is a harmless no-op when it
+      # already fires and rescues the cases where it does not (public repo +
+      # public package required for provenance).
+      - name: Publish to npm
+        run: |
+          unset NODE_AUTH_TOKEN
+          npm publish --provenance

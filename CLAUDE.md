@@ -1,5 +1,28 @@
 # CLAUDE.md — Nightsweeper repo notes for coding agents
 
+> **⚠ Node rewrite in progress (npm-native product).** The future home is `lib/*.mjs`
+> + `bin/nightsweeper.mjs` + `package.json` (deps: `@inquirer/prompts`, `yaml`; JSONL
+> ledger). It calls the lanes "**agents**" (qwen/codex/claude). Phase 1 done: hub,
+> setup wizard, agents+energy, readiness, dispatcher/validator/gates/isolation, report.
+> Phase 2 (in progress): backlog sources `github_issues` / `apple_notes` (heading
+> scoping) / `linear` / `todo_scan` (enrolled `TODO(nightsweeper: validator=X value=Y)`
+> markers only — bare TODOs ignored); report **downgrade recommendation** (paid-but-
+> underused agent, pass-per-$ first-class); `run --choose-lanes` interactive agent
+> picker; **preflight** cost model (`lib/preflight.mjs`: `cost_model` → `{lo,hi}`,
+> dormant in V1; advisory records `predicted_lo/hi` + report bracket-accuracy line;
+> opt-in `preflight.mode: gate` parks over-`per_task_cap` chores). **38 node:test
+> cases** (`npm test` → `node --test test/*.test.mjs`) covering dispatcher / sources /
+> tasks / report / validator / config / ledger / preflight. Example config rewritten
+> to the Node schema (`agents:`/`kind:`). **Publishing:** OIDC Trusted Publishing via
+> `.github/workflows/release.yml` (see `RELEASING.md`) — Node 24 runner, no `registry-url`,
+> `unset NODE_AUTH_TOKEN`, `npm publish --provenance`; the FIRST publish must be a manual
+> token/login bootstrap (npm has no pending-publisher). Remaining: bootstrap first publish
+> + register the trusted publisher (needs user npm auth), drive tests toward parity.
+> **Gotcha fixed:** the stock `/bin/` Go rule in `.gitignore` was excluding the package
+> entry point — removed; never re-add it.
+> **The Python `nightsweeper/` below is the REFERENCE SPEC (127 tests)** — port from
+> it; don't diverge behavior. Keep both until parity, then archive Python.
+
 Local-first, capacity-aware overnight scheduler. **Python 3.10+ stdlib + PyYAML.**
 Read `docs/plans/2026-06-15-001-feat-nightsweeper-overnight-scheduler-plan.md` (the
 build plan, V1 detail + V2 roadmap) and `docs/brainstorms/2026-06-15-nightsweeper-requirements.md`

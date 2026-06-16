@@ -1,29 +1,32 @@
 # Nightsweeper configuration (committed example).
-# Copy to nightsweeper.config.yaml (gitignored) and edit for your machine.
+# Copy to nightsweeper.config.yaml (gitignored) and edit for your machine,
+# or just run `nightsweeper setup` to generate one interactively.
 
 schedule:
   hour: 3        # 03:00 local; launchd StartCalendarInterval
   minute: 0
 
 caps:
-  nightly_task_cap: 20       # hard stop: max tasks dispatched per night
-  nightly_dollar_cap: 5.00   # hard stop: max $ spent across cloud lanes per night
+  nightly_task_cap: 20       # hard stop: max chores dispatched per night
+  nightly_dollar_cap: 5.00   # hard stop: max $ spent across paid agents per night
   per_task_cap: 1.00         # enforced only when preflight.mode == 'gate' (V2)
 
-# Read-only context enrichers (V2): never produce tasks, only add context passed
-# to a lane via dispatch(context=). Gbrain is an enricher (no confirmed backlog MCP).
-enrichers: []                # e.g. ["gbrain"] once a Gbrain MCP is wired
+# Where your authored chore list lives (YAML or JSON). Each entry may carry a
+# per-task `validator_cmd` (a shell command that exits 0 iff the chore is done),
+# which makes it a custom-cmd chore — the "did it work?" forcing function.
+tasks_file: nightsweeper.tasks.yaml
 
 # Preflight cost prediction (V2). 'advisory' records predicted_lo/hi + a report
-# accuracy line; 'gate' additionally skips tasks whose estimate exceeds per_task_cap.
-# Ships 'advisory' until your own 20-task replay clears the >=70% bracket bar (S6).
+# accuracy line; 'gate' additionally parks chores whose estimate exceeds per_task_cap.
+# Ships 'advisory' until your own replay clears the report's >=70% bracket bar.
 preflight:
   mode: advisory
 
+# Extra backlog sources beyond tasks_file. Sources only ever surface REAL chores —
+# Nightsweeper never invents work.
 sources:
   - name: github_issues
     repos: ["phdev/Nightsweeper"]
-    labels: []               # optional label filter
     value_label_map:
       "priority:high": high
       "priority:med": med
@@ -33,51 +36,44 @@ sources:
     default_validator: test
 
   - name: todo_scan
-    paths: ["."]
-    # Only ENROLLED markers dispatch — bare TODO/FIXME are report-only inventory:
-    #   TODO(nightsweeper: validator=test value=med)
+    root: "."
+    # Only ENROLLED markers dispatch — bare TODO/FIXME are left alone:
+    #   TODO(nightsweeper: validator=test value=med) make the retry path idempotent
     default_value: low
-
-  # A literal task-list file you author (YAML or JSON). Each entry may carry a
-  # per-task `validator_cmd` (a shell command that exits 0 iff the task is done),
-  # which makes the task a custom-cmd validator — the agent-ready forcing function.
-  # - name: tasklist
-  #   path: nightsweeper.tasks.yaml
+    default_validator: test
 
   # Apple Notes (macOS; needs Automation/TCC permission for headless runs).
-  # One line = one task; done items (strikethrough / [x]) are skipped; an inline
+  # One line = one chore; done items (strikethrough / [x]) are skipped; an inline
   # tag overrides defaults, e.g. "Fix retry [validator=test value=high]":
   # - name: apple_notes
   #   note: "AI learning path"
-  #   heading: Depthfinder    # optional: only items under this heading become tasks
+  #   heading: Depthfinder    # optional: only items under this heading become chores
   #   default_validator: test
 
-  # V2 source (needs $LINEAR_API_KEY):
+  # Linear (needs $LINEAR_API_KEY):
   # - name: linear
   #   team: ENG
   #   default_value: med
   #   default_validator: test
 
-backends:
-  # Free local lane. Two interchangeable harnesses (both $0, drive Ollama):
-  #   `aider`  — mature headless coder, stable CLI, proven end-to-end here (recommended)
-  #   `local`  — OpenClaw; co-locate with the worktree, can drive a remote Ollama
-  - name: aider                # the only truly-free lane ($0, unlimited)
+# Your agents — the overnight crew. cost_rank orders them: the cheapest eligible
+# agent that's free right now does each chore; it escalates ONCE on failure, then parks.
+agents:
+  # Free local agent. kind 'aider' drives an Ollama model headlessly (proven here).
+  - name: qwen
+    kind: aider                # or 'ollama'
     cost_rank: 0               # lower = cheaper = tried first when eligible
-    model: "qwen2.5-coder:7b"  # S3-validated; Qwen3-Coder-30B is the agentic upgrade
+    model: "qwen2.5-coder:7b"
     ollama_host: "http://localhost:11434"   # or http://<lan-ip>:11434 for a remote model
     edit_format: whole         # robust for small models
     timeout_sec: 1800
     capability:
       validators: [test, typecheck, build, custom-cmd]
-      max_complexity: medium   # set from S3's measured pass-rate-by-complexity
-  # - name: local              # OpenClaw alternative (split-host friendly)
-  #   cost_rank: 0
-  #   model: "qwen2.5-coder:7b"
-  #   ollama_host: "http://192.168.1.54:11434"
+      max_complexity: medium
 
-  - name: codex                # V2: ChatGPT-plan quota, $0 marginal, quota-gated
-    cost_rank: 1               # cheaper than claude ($0 vs metered) → preferred cloud lane
+  - name: codex                # ChatGPT-plan quota, $0 marginal, quota-gated
+    kind: codex
+    cost_rank: 1               # cheaper than claude ($0 vs metered) → preferred cloud agent
     max_used_percent: 95       # unavailable once either rate-limit window hits this
     sessions_dir: "~/.codex/sessions"
     timeout_sec: 1800
@@ -85,10 +81,11 @@ backends:
       validators: [test, typecheck, build, custom-cmd]
       max_complexity: high
 
-  - name: claude               # metered cloud lane; budget-gated, fail-closed
+  - name: claude               # metered cloud agent; budget-gated, fail-closed
+    kind: claude
     cost_rank: 2
-    model: "claude-sonnet-4-6" # S1: ~$0.05/small task
-    nightly_budget: 3.00       # per-night $ budget for this lane (budget-fallback)
+    model: "claude-sonnet-4-6"
+    nightly_budget: 3.00       # per-night $ budget for this agent; also the downgrade denominator
     per_task_floor: 0.50       # min remaining budget to attempt (no estimate in V1)
     timeout_sec: 1800
     cost_model:                # V2 preflight estimate (Sonnet list rates, $/Mtok)
@@ -100,28 +97,28 @@ backends:
       max_complexity: high
 
 validators:
-  test: "pytest -q"
-  typecheck: "mypy ."
-  build: "make build"
+  test: "npm test"
+  typecheck: "tsc --noEmit"
+  build: "npm run build"
 
-# Adjudication gates (multi-validator): run AFTER a task's functional validator
-# passes; ALL must hold for the task to pass, and each is reported separately. A
-# task that passes its tests but fails a gate is kept OUT of a passing branch —
-# so the agent can't "pass" by degrading the codebase.
+# Adjudication gates (multi-validator): run AFTER a chore's functional validator
+# passes; ALL must hold, and each is reported separately. A change that passes its
+# tests but fails a gate is kept OUT of a passing branch — so an agent can't "pass"
+# by degrading the codebase.
 # gates:
 #   - name: depthfinder
-#     cmd: "npx depthfinder scan . --warn-below 0.85"
+#     cmd: "npx depthfinder scan . --warn-below 0.85 --strict"
 #     required: true       # set false to skip silently when the command isn't installed
 
 isolation:
   worktree_dir: ".nightsweeper/worktrees"
   pr_opt_in: false             # default: labeled branch only, no PR
   branch_prefix: "nightsweeper/"
-  label_prefix: "nightsweeper:"
+  base_ref: "origin/HEAD"
 
 report:
   path: "nightsweeper-report.md"
   downgrade:
     window_nights: 7
-    spend_pct_threshold: 0.10  # recommend downgrade if spend < 10% of cap ...
-    min_passes: 1              # ... AND lane-attributable passes < this
+    spend_pct_threshold: 0.25  # recommend downgrade if spend < 25% of the window budget ...
+    min_passes: 3              # ... AND agent-attributable passes < this
