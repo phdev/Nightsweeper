@@ -77,3 +77,7 @@ class LocalBackend(BackendAdapter):
     def estimate(self, task) -> CostRange:
         return CostRange(lo=0.0, hi=0.0)  # local is free
 
+    def usage_summary(self) -> str:
+        up = self._ollama_up()
+        return f"local {self.model} (openclaw) · free ($0)" if up else f"local {self.model} · Ollama unreachable"
+

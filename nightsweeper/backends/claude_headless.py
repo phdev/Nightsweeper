@@ -45,6 +45,11 @@ class ClaudeBackend(BackendAdapter):
     def estimate(self, task):
         return estimate_usd(task.est_context_tokens, self.cost_model)
 
+    def usage_summary(self) -> str:
+        r = self._remaining()
+        state = "" if (r > 0 and r >= self.per_task_floor) else "  ⚠ exhausted (fail-closed)"
+        return f"Agent SDK credit · ${r:.2f} of ${self.nightly_budget:.2f} budget left tonight{state}"
+
     def bind_runtime(self, ledger, night_start_ts: str) -> None:
         self._ledger = ledger
         self._night_start = night_start_ts

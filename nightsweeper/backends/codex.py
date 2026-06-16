@@ -96,3 +96,12 @@ class CodexBackend(BackendAdapter):
 
     def estimate(self, task) -> CostRange:
         return CostRange(lo=0.0, hi=0.0)  # quota-gated, no $ cost
+
+    def usage_summary(self) -> str:
+        rl = self._read_rate_limits()
+        if not rl:
+            return "ChatGPT quota · $0 · windows unread (optimistic)"
+        p = (rl.get("primary") or {}).get("used_percent", 0.0)
+        s = (rl.get("secondary") or {}).get("used_percent", 0.0)
+        tag = "" if max(p, s) < self.max_used_percent else "  ⚠ EXHAUSTED"
+        return f"ChatGPT quota · $0 · 5h {p:.0f}% used · weekly {s:.0f}% used{tag}"

@@ -43,3 +43,17 @@ class BackendAdapter(abc.ABC):
     def estimate(self, task: Task) -> Optional[CostRange]:
         """Preflight cost band. Dormant in V1 (returns ``None``); made real in V2."""
         return None
+
+    def usage_summary(self) -> str:
+        """One-line human-readable available-usage for the interactive lane chooser.
+
+        Default derives from ``probe_headroom``; lanes override for richer detail
+        (Codex quota windows, Claude budget remaining). ``bind_runtime`` should be
+        called first for budget-aware lanes.
+        """
+        cap = self.probe_headroom()
+        if not cap.available:
+            return "unavailable"
+        if cap.unit == "usd":
+            return f"budget ${cap.dollars_remaining:.2f} remaining"
+        return "free ($0)"

@@ -53,6 +53,39 @@ def _night_start() -> str:
     return n.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
 
 
+def select_lanes(backends: list, args) -> list:
+    """Filter the backends for this run: --lanes <names>, --choose-lanes (interactive),
+    or all. Backends should be bound (bind_runtime) so usage shows live budget/quota."""
+    if getattr(args, "lanes", None):
+        names = {n.strip() for n in args.lanes.split(",") if n.strip()}
+        chosen = [b for b in backends if b.name in names]
+        if not chosen:
+            sys.exit(f"nightsweeper: --lanes {args.lanes!r} matched none of "
+                     f"{[b.name for b in backends]}")
+        return chosen
+    if getattr(args, "choose_lanes", False):
+        ordered = sorted(backends, key=lambda b: b.cost_rank)
+        print("Lanes available tonight (cheapest first):")
+        for i, b in enumerate(ordered, 1):
+            print(f"  {i}. {b.name:8} — {b.usage_summary()}")
+        try:
+            resp = input("Use which lanes? (comma names/numbers, blank = all): ").strip()
+        except EOFError:
+            resp = ""
+        if not resp:
+            return backends
+        chosen, seen = [], set()
+        for tok in (t.strip() for t in resp.split(",")):
+            picks = ([ordered[int(tok) - 1]] if tok.isdigit() and 1 <= int(tok) <= len(ordered)
+                     else [b for b in backends if b.name == tok])
+            for b in picks:
+                if b.name not in seen:
+                    seen.add(b.name)
+                    chosen.append(b)
+        return chosen or backends
+    return backends
+
+
 def cmd_run(args) -> int:
     cfg = configmod.load(args.config)
     root = _git_root()
@@ -74,6 +107,14 @@ def cmd_run(args) -> int:
         sources = registry.build_sources(cfg)
         backends = registry.build_backends(cfg)
         ledger = Ledger(args.db or (sd / "ledger.db"))
+
+        # bind runtime (so usage shows live budget/quota), then pick lanes for this run
+        for b in backends:
+            b.bind_runtime(ledger, _night_start())
+        backends = select_lanes(backends, args)
+        if not backends:
+            print("nightsweeper: no lanes selected — nothing to run")
+            return 0
 
         tasks, inventory = [], {}
         for s in sources:
@@ -117,12 +158,11 @@ def cmd_probe(args) -> int:
     backends = registry.build_backends(cfg)
     ledger = Ledger(args.db or (_state_dir(root) / "ledger.db"))
     ns = _night_start()
-    print("Lane headroom (preview):")
+    print("Lane usage (preview):")
     for b in sorted(backends, key=lambda x: x.cost_rank):
         b.bind_runtime(ledger, ns)
-        cap = b.probe_headroom()
-        rem = "unbounded ($0)" if cap.unit == "unbounded" else f"${cap.dollars_remaining:.2f}"
-        print(f"  {b.name:8} cost_rank={b.cost_rank}  available={cap.available}  remaining={rem}")
+        print(f"  {b.name:8} cost_rank={b.cost_rank}  available={b.probe_headroom().available}  "
+              f"{b.usage_summary()}")
     return 0
 
 
@@ -151,6 +191,10 @@ def main(argv=None) -> int:
     r.add_argument("--if-missed", action="store_true",
                    help="only run if today's run hasn't happened (scheduler self-heal)")
     r.add_argument("--print", action="store_true", help="print the report to stdout")
+    r.add_argument("--lanes", default=None,
+                   help="comma list of lanes to use this run (e.g. aider,codex)")
+    r.add_argument("--choose-lanes", action="store_true",
+                   help="interactively pick lanes (shows live usage) before dispatch")
     r.set_defaults(func=cmd_run)
 
     sub.add_parser("probe", help="preview per-lane headroom").set_defaults(func=cmd_probe)

@@ -102,7 +102,7 @@ These attach at the seams V1 built (the two adapter interfaces, the `estimate()`
 ## Development
 
 ```bash
-.venv/bin/python -m pytest -q     # 116 tests
+.venv/bin/python -m pytest -q     # 127 tests
 ```
 
 See `CLAUDE.md` for the architecture map and how to add a lane/source.
