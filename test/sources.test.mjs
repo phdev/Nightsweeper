@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { parseNotesLines, appleNotesSource, todoScanSource } from '../lib/sources.mjs';
+import { parseNotesLines, appleNotesSource, todoScanSource, githubSource } from '../lib/sources.mjs';
 
 const NOTE = '<div><h1>AI learning path</h1></div><div><h2>Reading</h2></div>'
   + '<div>Read paper A</div><div><h2>Depthfinder</h2></div>'
@@ -60,4 +60,25 @@ test('todo_scan returns nothing when no enrolled markers exist', () => {
   s._files = () => ['/repo/x.js'];
   s._read = () => '// TODO: just a normal todo\n// FIXME: and a fixme\n';
   assert.equal(s.fetch().length, 0);
+});
+
+test('github_issues maps value labels + validator-prefixed labels, coerces bad ones', () => {
+  const s = githubSource({
+    repos: ['acme/widgets'],
+    value_label_map: { 'priority:high': 'high', 'priority:low': 'low' },
+    default_value: 'med', default_validator: 'test', validator_label_prefix: 'validator:',
+  });
+  s._list = () => [
+    { number: 1, title: 'urgent bug', body: 'fix it', labels: [{ name: 'priority:high' }, { name: 'validator:build' }] },
+    { number: 2, title: 'plain', body: 'x', labels: [] },
+    { number: 3, title: 'bad labels', body: 'y', labels: [{ name: 'validator:bogus' }] },
+  ];
+  const tasks = s.fetch();
+  assert.deepEqual(tasks.map((t) => t.id), ['gh:acme/widgets#1', 'gh:acme/widgets#2', 'gh:acme/widgets#3']);
+  assert.equal(tasks[0].value, 'high');
+  assert.equal(tasks[0].validator, 'build');
+  assert.equal(tasks[1].value, 'med');          // default
+  assert.equal(tasks[1].validator, 'test');     // default
+  assert.equal(tasks[2].validator, 'test');     // 'bogus' coerced back to default
+  assert.equal(tasks[0].source, 'github_issues');
 });
