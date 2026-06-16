@@ -32,6 +32,10 @@ class CodexBackend(BackendAdapter):
         self.sessions_dir = os.path.expanduser(o.get("sessions_dir", "~/.codex/sessions"))
         self.timeout_sec = int(o.get("timeout_sec", 1800))
         self.model = o.get("model")
+        # codex exec defaults to read-only and won't edit files headlessly. 'workspace-write'
+        # lets it write to the worktree while staying SANDBOXED (safer than Claude's
+        # skip-permissions). 'bypass' = --dangerously-bypass-approvals-and-sandbox (full).
+        self.sandbox_mode = o.get("sandbox_mode", "workspace-write")
 
     # injectable for tests
     def _read_rate_limits(self) -> Optional[dict]:
@@ -65,7 +69,11 @@ class CodexBackend(BackendAdapter):
 
     # injectable for tests
     def _run_codex(self, task, workdir: str):
-        cmd = ["codex", "exec", "--json"]
+        cmd = ["codex", "exec", "--json", "--skip-git-repo-check"]
+        if self.sandbox_mode == "bypass":
+            cmd.append("--dangerously-bypass-approvals-and-sandbox")
+        else:
+            cmd += ["--sandbox", self.sandbox_mode]  # default workspace-write (sandboxed edits)
         if self.model:
             cmd += ["--model", self.model]
         cmd.append(f"{task.title}\n\n{task.body}")

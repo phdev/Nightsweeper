@@ -62,6 +62,20 @@ def test_codex_is_zero_marginal():
     assert be.estimate(task("t")) == CostRange(0.0, 0.0)
 
 
+def test_codex_run_can_edit_headlessly(monkeypatch):
+    import nightsweeper.backends.codex as cmod
+    be = CodexBackend(_bcfg("codex"))  # default sandbox_mode == 'workspace-write'
+    captured = {}
+
+    class _R:
+        returncode, stdout, stderr = 0, "", ""
+
+    monkeypatch.setattr(cmod.subprocess, "run", lambda cmd, **kw: captured.update(cmd=cmd) or _R())
+    be._run_codex(task("t"), "/wd")
+    assert "--sandbox" in captured["cmd"] and "workspace-write" in captured["cmd"]  # else read-only
+    assert "--skip-git-repo-check" in captured["cmd"]
+
+
 # --- Linear source ---
 
 def test_linear_maps_priority_and_coerces(monkeypatch):
