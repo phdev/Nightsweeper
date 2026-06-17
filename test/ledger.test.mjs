@@ -12,17 +12,19 @@ const row = (o) => ({ task_id: 'a', backend: 'qwen', consumed: 0, passed: false,
 
 test('record persists to JSONL and reloads on reopen', () => {
   const l = tmpLedger();
-  l.record(row({ task_id: 'x' }));
+  l.record(row({ task_id: 'x', passed: true }));
   assert.ok(existsSync(l.file));
   const reopened = new Ledger(l.file);
   assert.equal(reopened.hasRun('x'), true);
 });
 
-test('hasRun dedupes already-attempted chores', () => {
+test('hasRun is true only for PASSED chores (failed/parked re-enqueue next run)', () => {
   const l = tmpLedger();
   assert.equal(l.hasRun('a'), false);
-  l.record(row({ task_id: 'a' }));
-  assert.equal(l.hasRun('a'), true);
+  l.record(row({ task_id: 'a', passed: false }));            // attempted, but failed/parked
+  assert.equal(l.hasRun('a'), false, 'a failed chore is NOT dropped — it comes back next run');
+  l.record(row({ task_id: 'a', passed: true }));             // now it passed
+  assert.equal(l.hasRun('a'), true, 'a passed chore is deduped from future runs');
   assert.equal(l.hasRun('b'), false);
 });
 

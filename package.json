@@ -1,6 +1,6 @@
 {
   "name": "nightsweeper",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A local-first, capacity-aware overnight scheduler that dispatches a real backlog to your idle AI agents (Qwen, Codex, Claude), validates each result, and writes a morning report.",
   "type": "module",
   "bin": {

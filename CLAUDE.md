@@ -20,6 +20,19 @@
 > + register the trusted publisher (needs user npm auth), drive tests toward parity.
 > **Gotcha fixed:** the stock `/bin/` Go rule in `.gitignore` was excluding the package
 > entry point — removed; never re-add it.
+>
+> **v0.1.1 — two correctness bugs fixed (validated by a live arbitrage run: codex did 4
+> chores for $0, claude untouched).** (1) *Blind escalation* — `dispatcher` now feeds the
+> validator's failure detail forward into `task.context.priorFailure`, and all three agents
+> build the prompt via `buildPrompt(task, ctx)` (a retried chore gets a sharper prompt, a
+> DETERMINISTIC ladder — never the model-driven iterate-to-green that would surrender the
+> determinism moat). The `validator` now includes the failed command's output tail in
+> `detail`. (2) *Permanent drop* — `ledger.hasRun` now means PASSED only, so a failed/parked
+> chore re-enters the backlog next run instead of being silently dropped forever. **47
+> node:test cases.** Strategic note: a session of live tests showed Depthfinder is a
+> commodity (a model + ctxlint both match it), but Nightsweeper's cross-vendor governor +
+> honest-downgrade is incentive-incompatible (a paid gateway won't route to your free/quota
+> capacity) and fired live — this is the durable product. Next: a real-backlog test.
 > **The Python `nightsweeper/` below is the REFERENCE SPEC (127 tests)** — port from
 > it; don't diverge behavior. Keep both until parity, then archive Python.
 

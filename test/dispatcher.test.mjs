@@ -32,6 +32,21 @@ test('local fails → escalates once → claude passes', async () => {
   assert.equal(ledger.rows[1].escalated, true);
 });
 
+test('escalation feeds the failure forward (deterministic ladder, not a blind re-run)', async () => {
+  const ledger = fakeLedger();
+  let ctxSeen = null;
+  const local = { name: 'qwen', costRank: 0, capability: cap, probe: async () => ({ available: true }), dispatch: () => ({ ok: true, consumedUsd: 0 }) };
+  const claude = { name: 'claude', costRank: 1, capability: cap, probe: async () => ({ available: true }),
+    dispatch: (t, wd, ctx) => { ctxSeen = ctx; return { ok: true, consumedUsd: 0.1 }; } };
+  let calls = 0;
+  const validator = { validate: () => (calls++ === 0 ? { result: 'failed', detail: '`grep hello x` exited 1' } : { result: 'passed' }) };
+  const d = new Dispatcher([local, claude], fakeIso, validator, ledger, { caps: { nightly_task_cap: 5, nightly_dollar_cap: 5 } });
+  await d.run([task('t1')]);
+  assert.ok(ctxSeen?.priorFailure, 'the escalated agent receives the prior failure detail');
+  assert.equal(ctxSeen.priorFailure.agent, 'qwen');
+  assert.match(ctxSeen.priorFailure.detail, /grep hello/);
+});
+
 test('zero chores → no run', async () => {
   const d = new Dispatcher([], fakeIso, { validate: () => {} }, fakeLedger(), { caps: { nightly_task_cap: 5, nightly_dollar_cap: 5 } });
   const s = await d.run([]);
